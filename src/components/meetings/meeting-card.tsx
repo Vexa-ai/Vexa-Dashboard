@@ -6,7 +6,7 @@ import { Clock, ChevronRight, Calendar, MessageSquare } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { Meeting } from "@/types/vexa";
-import { MEETING_STATUS_CONFIG } from "@/types/vexa";
+import { getDetailedStatus } from "@/types/vexa";
 import { cn } from "@/lib/utils";
 
 interface MeetingCardProps {
@@ -40,7 +40,7 @@ function TeamsIcon({ className }: { className?: string }) {
 }
 
 export function MeetingCard({ meeting }: MeetingCardProps) {
-  const statusConfig = MEETING_STATUS_CONFIG[meeting.status];
+  const statusConfig = getDetailedStatus(meeting.status, meeting.data);
   // Platform detection - check if it's Google Meet (not Teams)
   const isGoogleMeet = meeting.platform !== "teams";
   // Display title from API data (name or title field)

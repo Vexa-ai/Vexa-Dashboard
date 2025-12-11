@@ -32,8 +32,9 @@ import { BotStatusIndicator, BotFailedIndicator } from "@/components/meetings/bo
 import { AIChatPanel } from "@/components/ai";
 import { useMeetingsStore } from "@/stores/meetings-store";
 import { useLiveTranscripts } from "@/hooks/use-live-transcripts";
-import { PLATFORM_CONFIG, MEETING_STATUS_CONFIG } from "@/types/vexa";
+import { PLATFORM_CONFIG, getDetailedStatus } from "@/types/vexa";
 import type { MeetingStatus } from "@/types/vexa";
+import { StatusHistory } from "@/components/meetings/status-history";
 import { cn } from "@/lib/utils";
 import { vexaAPI } from "@/lib/api";
 import { toast } from "sonner";
@@ -180,7 +181,7 @@ export default function MeetingDetailPage() {
   }
 
   const platformConfig = PLATFORM_CONFIG[currentMeeting.platform];
-  const statusConfig = MEETING_STATUS_CONFIG[currentMeeting.status];
+  const statusConfig = getDetailedStatus(currentMeeting.status, currentMeeting.data);
 
   const duration =
     currentMeeting.start_time && currentMeeting.end_time
@@ -477,12 +478,27 @@ export default function MeetingDetailPage() {
               </Card>
             )}
 
-          {/* Stats */}
+          {/* Details */}
           <Card>
             <CardHeader>
-              <CardTitle>Stats</CardTitle>
+              <CardTitle>Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* Status with description */}
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Status</span>
+                <div className="text-right">
+                  <span className={cn("font-medium", statusConfig.color)}>
+                    {statusConfig.label}
+                  </span>
+                  {statusConfig.description && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {statusConfig.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Separator />
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Segments</span>
                 <span className="font-medium">{transcripts.length}</span>
@@ -504,6 +520,14 @@ export default function MeetingDetailPage() {
                   )}
                 </span>
               </div>
+
+              {/* Status History */}
+              {currentMeeting.data?.status_transition && currentMeeting.data.status_transition.length > 0 && (
+                <>
+                  <Separator />
+                  <StatusHistory transitions={currentMeeting.data.status_transition} />
+                </>
+              )}
             </CardContent>
           </Card>
 

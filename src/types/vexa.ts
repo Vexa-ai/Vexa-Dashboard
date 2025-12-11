@@ -23,6 +23,18 @@ export interface Meeting {
   updated_at?: string;
 }
 
+// Status transition record from Vexa API
+export interface StatusTransition {
+  from: MeetingStatus | string;
+  to: MeetingStatus | string;
+  timestamp: string;
+  source?: string;
+  reason?: string;
+  completion_reason?: string;
+  container_id?: string;
+  finalized_by?: string;
+}
+
 export interface MeetingData {
   name?: string;
   title?: string;
@@ -34,6 +46,10 @@ export interface MeetingData {
   error_code?: string;
   status_message?: string;
   failure_reason?: string;
+  // Completion details
+  completion_reason?: string;
+  // Status history
+  status_transition?: StatusTransition[];
   [key: string]: unknown;
 }
 
@@ -204,6 +220,88 @@ export const MEETING_STATUS_CONFIG: Record<MeetingStatus, { label: string; color
   completed: { label: "Completed", color: "text-blue-600", bgColor: "bg-blue-100" },
   failed: { label: "Failed", color: "text-red-600", bgColor: "bg-red-100" },
 };
+
+// Get detailed status info based on meeting data
+export interface DetailedStatusInfo {
+  label: string;
+  color: string;
+  bgColor: string;
+  description?: string;
+}
+
+export function getDetailedStatus(status: MeetingStatus, data?: MeetingData): DetailedStatusInfo {
+  const baseConfig = MEETING_STATUS_CONFIG[status];
+
+  // For completed meetings, check completion reason
+  if (status === "completed" && data?.completion_reason) {
+    switch (data.completion_reason) {
+      case "stopped":
+        return {
+          label: "Stopped",
+          color: "text-slate-600",
+          bgColor: "bg-slate-100",
+          description: "Manually stopped by user",
+        };
+      case "meeting_ended":
+        return {
+          label: "Ended",
+          color: "text-blue-600",
+          bgColor: "bg-blue-100",
+          description: "Meeting ended naturally",
+        };
+      case "kicked":
+      case "removed":
+        return {
+          label: "Removed",
+          color: "text-orange-600",
+          bgColor: "bg-orange-100",
+          description: "Bot was removed from meeting",
+        };
+      default:
+        return { ...baseConfig, description: "Transcription completed" };
+    }
+  }
+
+  // For failed meetings, add description based on error
+  if (status === "failed") {
+    let description = "Transcription failed";
+    if (data?.error_code) {
+      switch (data.error_code.toLowerCase()) {
+        case "admission_timeout":
+        case "not_admitted":
+          description = "Bot was not admitted to meeting";
+          break;
+        case "meeting_ended":
+          description = "Meeting ended before bot could join";
+          break;
+        case "connection_failed":
+          description = "Failed to connect to meeting";
+          break;
+      }
+    }
+    return { ...baseConfig, description };
+  }
+
+  // For active meetings
+  if (status === "active") {
+    return { ...baseConfig, description: "Recording in progress" };
+  }
+
+  // For joining states
+  if (status === "joining") {
+    return { ...baseConfig, description: "Connecting to meeting" };
+  }
+
+  if (status === "awaiting_admission") {
+    return { ...baseConfig, description: "Waiting in lobby" };
+  }
+
+  if (status === "requested") {
+    return { ...baseConfig, description: "Starting bot" };
+  }
+
+  return baseConfig;
+}
 
 // Languages supported by Whisper
 export const SUPPORTED_LANGUAGES = [
