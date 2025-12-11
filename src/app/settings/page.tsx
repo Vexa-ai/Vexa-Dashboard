@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { vexaAPI } from "@/lib/api";
 import { AdminGuard } from "@/components/admin/admin-guard";
-import { getVexaWebSocketUrl } from "@/lib/utils";
 
 interface AIConfig {
   enabled: boolean;
@@ -21,16 +20,32 @@ interface AIConfig {
   hasBaseUrl?: boolean;
 }
 
+interface RuntimeConfig {
+  wsUrl: string;
+  apiUrl: string;
+}
+
 function SettingsContent() {
   const [isTesting, setIsTesting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"unknown" | "connected" | "error">("unknown");
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [aiConfig, setAIConfig] = useState<AIConfig | null>(null);
   const [isLoadingAIConfig, setIsLoadingAIConfig] = useState(true);
+  const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig | null>(null);
 
-  // Fetch AI configuration on mount
+  // Fetch configurations on mount
   useEffect(() => {
-    async function fetchAIConfig() {
+    async function fetchConfigs() {
+      // Fetch runtime config (WebSocket URL)
+      try {
+        const configResponse = await fetch("/api/config");
+        const config = await configResponse.json();
+        setRuntimeConfig(config);
+      } catch (error) {
+        console.error("Failed to fetch runtime config:", error);
+      }
+
+      // Fetch AI config
       try {
         const response = await fetch("/api/ai/config");
         const config = await response.json();
@@ -42,7 +57,7 @@ function SettingsContent() {
         setIsLoadingAIConfig(false);
       }
     }
-    fetchAIConfig();
+    fetchConfigs();
   }, []);
 
   const handleTestConnection = async () => {
@@ -117,12 +132,12 @@ function SettingsContent() {
               <Label htmlFor="wsUrl">WebSocket URL</Label>
               <Input
                 id="wsUrl"
-                value={getVexaWebSocketUrl()}
+                value={runtimeConfig?.wsUrl || "Loading..."}
                 disabled
                 className="font-mono bg-muted"
               />
               <p className="text-xs text-muted-foreground">
-                Auto-derived from <code className="bg-muted px-1 rounded">NEXT_PUBLIC_VEXA_API_URL</code>
+                Auto-derived from <code className="bg-muted px-1 rounded">VEXA_API_URL</code>
               </p>
             </div>
 
