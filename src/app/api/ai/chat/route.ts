@@ -1,31 +1,91 @@
-import { streamText, convertToModelMessages } from "ai";
+import { streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
-import type { AIProvider } from "@/stores/ai-store";
 
 export const runtime = "nodejs";
 
-interface UIMessagePart {
-  type: string;
-  text?: string;
+// Parse AI_MODEL env var format: "provider/model" (e.g., "openai/gpt-4o")
+function parseAIModel(): { provider: string; model: string } | null {
+  const aiModel = process.env.AI_MODEL;
+  if (!aiModel) return null;
+
+  const [provider, ...modelParts] = aiModel.split("/");
+  const model = modelParts.join("/"); // Handle models with / in name (e.g., "openrouter/openai/gpt-4o")
+
+  if (!provider || !model) return null;
+
+  return { provider: provider.toLowerCase(), model };
 }
 
-interface UIMessage {
-  role: "user" | "assistant" | "system";
-  content?: string;
-  parts?: UIMessagePart[];
-}
+function getModel() {
+  const config = parseAIModel();
+  if (!config) {
+    throw new Error("AI not configured. Set AI_MODEL environment variable.");
+  }
 
-interface ChatRequest {
-  messages: UIMessage[];
-  context: string;
-  settings: {
-    provider: AIProvider;
-    apiKey: string;
-    model: string;
-    customBaseUrl?: string;
-    customModel?: string;
-  };
+  const apiKey = process.env.AI_API_KEY;
+  const baseUrl = process.env.AI_BASE_URL;
+  const { provider, model } = config;
+
+  switch (provider) {
+    case "openai": {
+      if (!apiKey) throw new Error("AI_API_KEY is required for OpenAI");
+      const openai = createOpenAI({
+        apiKey,
+        baseURL: baseUrl || "https://api.openai.com/v1",
+      });
+      return openai(model);
+    }
+
+    case "anthropic": {
+      if (!apiKey) throw new Error("AI_API_KEY is required for Anthropic");
+      const anthropic = createAnthropic({
+        apiKey,
+      });
+      return anthropic(model);
+    }
+
+    case "groq": {
+      if (!apiKey) throw new Error("AI_API_KEY is required for Groq");
+      const groq = createOpenAI({
+        apiKey,
+        baseURL: baseUrl || "https://api.groq.com/openai/v1",
+      });
+      return groq(model);
+    }
+
+    case "openrouter": {
+      if (!apiKey) throw new Error("AI_API_KEY is required for OpenRouter");
+      const openrouter = createOpenAI({
+        apiKey,
+        baseURL: baseUrl || "https://openrouter.ai/api/v1",
+      });
+      return openrouter(model);
+    }
+
+    case "ollama":
+    case "local":
+    case "custom": {
+      // For local/custom providers, API key may not be needed
+      const custom = createOpenAI({
+        apiKey: apiKey || "not-needed",
+        baseURL: baseUrl || "http://localhost:11434/v1",
+      });
+      return custom(model);
+    }
+
+    default: {
+      // Treat unknown providers as OpenAI-compatible with custom base URL
+      if (!baseUrl) {
+        throw new Error(`Unknown provider "${provider}". Set AI_BASE_URL for custom providers.`);
+      }
+      const customProvider = createOpenAI({
+        apiKey: apiKey || "not-needed",
+        baseURL: baseUrl,
+      });
+      return customProvider(model);
+    }
+  }
 }
 
 const SYSTEM_PROMPT = `You are a helpful AI assistant specialized in analyzing meeting transcripts and conversations. You help users find information, summarize discussions, identify action items, and answer questions based on the transcript content provided.
@@ -42,57 +102,20 @@ Guidelines:
 Available transcript context:
 `;
 
-function getModel(settings: ChatRequest["settings"]) {
-  const { provider, apiKey, model, customBaseUrl, customModel } = settings;
+interface UIMessagePart {
+  type: string;
+  text?: string;
+}
 
-  switch (provider) {
-    case "openai": {
-      const openai = createOpenAI({
-        apiKey,
-        baseURL: "https://api.openai.com/v1",
-      });
-      return openai(model);
-    }
+interface UIMessage {
+  role: "user" | "assistant" | "system";
+  content?: string;
+  parts?: UIMessagePart[];
+}
 
-    case "anthropic": {
-      const anthropic = createAnthropic({
-        apiKey,
-      });
-      return anthropic(model);
-    }
-
-    case "groq": {
-      // Groq uses OpenAI-compatible API
-      const groq = createOpenAI({
-        apiKey,
-        baseURL: "https://api.groq.com/openai/v1",
-      });
-      return groq(model);
-    }
-
-    case "openrouter": {
-      // OpenRouter uses OpenAI-compatible API
-      const openrouter = createOpenAI({
-        apiKey,
-        baseURL: "https://openrouter.ai/api/v1",
-      });
-      return openrouter(model);
-    }
-
-    case "custom": {
-      if (!customBaseUrl) {
-        throw new Error("Custom provider requires a base URL");
-      }
-      const custom = createOpenAI({
-        apiKey: apiKey || "not-needed",
-        baseURL: customBaseUrl,
-      });
-      return custom(customModel || model);
-    }
-
-    default:
-      throw new Error(`Unsupported provider: ${provider}`);
-  }
+interface ChatRequest {
+  messages: UIMessage[];
+  context: string;
 }
 
 // Convert UI messages (with parts) to model messages (with content)
@@ -124,29 +147,23 @@ function convertMessages(messages: UIMessage[]): Array<{ role: "user" | "assista
 
 export async function POST(request: Request) {
   try {
+    // Check if AI is configured
+    if (!process.env.AI_MODEL) {
+      return new Response(JSON.stringify({ error: "AI is not configured on this instance" }), {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const body: ChatRequest = await request.json();
-    const { messages, context, settings } = body;
-
-    if (!settings?.provider) {
-      return new Response(JSON.stringify({ error: "AI provider not configured" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    if (!settings?.apiKey && settings.provider !== "custom") {
-      return new Response(JSON.stringify({ error: "API key is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+    const { messages, context } = body;
 
     // Build the full system prompt with context
     const systemPrompt = context
       ? `${SYSTEM_PROMPT}\n\n${context}`
       : SYSTEM_PROMPT + "\n\nNo transcript context available. You can still help with general questions.";
 
-    const model = getModel(settings);
+    const model = getModel();
 
     // Convert UI messages to model messages
     const modelMessages = convertMessages(messages);

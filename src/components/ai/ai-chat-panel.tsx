@@ -16,6 +16,7 @@ import {
   X,
   Bot,
   User,
+  AlertCircle,
 } from "lucide-react";
 import {
   Dialog,
@@ -27,8 +28,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useAIStore } from "@/stores/ai-store";
-import { AISettingsDialog } from "./ai-settings-dialog";
 import { cn } from "@/lib/utils";
 import type { Meeting, TranscriptSegment } from "@/types/vexa";
 
@@ -36,6 +35,12 @@ interface AIChatPanelProps {
   meeting?: Meeting;
   transcripts?: TranscriptSegment[];
   trigger?: React.ReactNode;
+}
+
+interface AIConfig {
+  enabled: boolean;
+  provider: string | null;
+  model: string | null;
 }
 
 function buildTranscriptContext(transcripts: TranscriptSegment[], meeting?: Meeting): string {
@@ -46,7 +51,7 @@ function buildTranscriptContext(transcripts: TranscriptSegment[], meeting?: Meet
   let context = "";
 
   if (meeting) {
-    context += `Meeting: ${meeting.data?.title || meeting.platform_specific_id}\n`;
+    context += `Meeting: ${meeting.data?.name || meeting.data?.title || meeting.platform_specific_id}\n`;
     context += `Platform: ${meeting.platform}\n`;
     if (meeting.data?.participants?.length) {
       context += `Participants: ${meeting.data.participants.join(", ")}\n`;
@@ -70,31 +75,40 @@ function buildTranscriptContext(transcripts: TranscriptSegment[], meeting?: Meet
 }
 
 export function AIChatPanel({ meeting, transcripts = [], trigger }: AIChatPanelProps) {
-  const { settings, isConfigured } = useAIStore();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
+  const [aiConfig, setAIConfig] = useState<AIConfig | null>(null);
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Check if AI is configured on mount
+  useEffect(() => {
+    async function checkAIConfig() {
+      try {
+        const response = await fetch("/api/ai/config");
+        const config = await response.json();
+        setAIConfig(config);
+      } catch (error) {
+        console.error("Failed to check AI config:", error);
+        setAIConfig({ enabled: false, provider: null, model: null });
+      } finally {
+        setIsLoadingConfig(false);
+      }
+    }
+    checkAIConfig();
+  }, []);
 
   // Build context from transcripts
   const context = buildTranscriptContext(transcripts, meeting);
 
-  // Memoize the transport to avoid recreation on every render
+  // Memoize the transport - no settings needed anymore
   const transport = useMemo(() => {
     return new DefaultChatTransport({
       api: "/api/ai/chat",
-      body: {
-        context,
-        settings: {
-          provider: settings.provider,
-          apiKey: settings.apiKey,
-          model: settings.model,
-          customBaseUrl: settings.customBaseUrl,
-          customModel: settings.customModel,
-        },
-      },
+      body: { context },
     });
-  }, [context, settings]);
+  }, [context]);
 
   const {
     messages,
@@ -109,6 +123,7 @@ export function AIChatPanel({ meeting, transcripts = [], trigger }: AIChatPanelP
   });
 
   const isLoading = status === "streaming" || status === "submitted";
+  const isConfigured = aiConfig?.enabled ?? false;
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -190,20 +205,28 @@ export function AIChatPanel({ meeting, transcripts = [], trigger }: AIChatPanelP
   // Get user-friendly error message
   const getErrorMessage = (err: Error): string => {
     const msg = err.message.toLowerCase();
+    if (msg.includes("not configured") || msg.includes("503")) {
+      return "AI is not configured on this server. Contact your administrator.";
+    }
     if (msg.includes("invalid api key") || msg.includes("incorrect api key") || msg.includes("401")) {
-      return "Invalid API key. Please check your API key in settings.";
+      return "Invalid API key configured. Contact your administrator.";
     }
     if (msg.includes("rate limit") || msg.includes("429")) {
       return "Rate limit exceeded. Please wait a moment and try again.";
     }
     if (msg.includes("insufficient") || msg.includes("quota")) {
-      return "API quota exceeded. Please check your account balance.";
+      return "API quota exceeded. Contact your administrator.";
     }
     if (msg.includes("network") || msg.includes("fetch")) {
       return "Network error. Please check your connection.";
     }
     return err.message;
   };
+
+  // Don't render trigger if AI is not configured
+  if (!isLoadingConfig && !isConfigured) {
+    return null;
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -227,7 +250,7 @@ export function AIChatPanel({ meeting, transcripts = [], trigger }: AIChatPanelP
                 <DialogTitle className="text-lg font-semibold">AI Assistant</DialogTitle>
                 {meeting && (
                   <p className="text-sm text-muted-foreground">
-                    {meeting.data?.title || meeting.platform_specific_id}
+                    {meeting.data?.name || meeting.data?.title || meeting.platform_specific_id}
                   </p>
                 )}
               </div>
@@ -244,7 +267,6 @@ export function AIChatPanel({ meeting, transcripts = [], trigger }: AIChatPanelP
                   Clear
                 </Button>
               )}
-              <AISettingsDialog />
             </div>
           </div>
         </DialogHeader>
@@ -273,16 +295,20 @@ export function AIChatPanel({ meeting, transcripts = [], trigger }: AIChatPanelP
         {/* Messages Area */}
         <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
           <div className="p-6">
-            {!isConfigured ? (
+            {isLoadingConfig ? (
+              <div className="h-full flex flex-col items-center justify-center text-center py-16">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">Checking AI availability...</p>
+              </div>
+            ) : !isConfigured ? (
               <div className="h-full flex flex-col items-center justify-center text-center py-16">
                 <div className="h-20 w-20 rounded-2xl bg-muted flex items-center justify-center mb-6">
-                  <Sparkles className="h-10 w-10 text-muted-foreground" />
+                  <AlertCircle className="h-10 w-10 text-muted-foreground" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Configure AI Provider</h3>
+                <h3 className="text-xl font-semibold mb-2">AI Not Configured</h3>
                 <p className="text-muted-foreground mb-6 max-w-md">
-                  Add your API key to start analyzing your meeting transcripts with AI
+                  The AI assistant is not configured on this server. Contact your administrator to enable it.
                 </p>
-                <AISettingsDialog />
               </div>
             ) : messages.length === 0 && !error ? (
               <div className="flex flex-col items-center justify-center text-center py-8">

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Settings, CheckCircle2, XCircle, Loader2, ExternalLink } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Settings, CheckCircle2, XCircle, Loader2, ExternalLink, Sparkles, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,10 +12,37 @@ import { toast } from "sonner";
 import { vexaAPI } from "@/lib/api";
 import { AdminGuard } from "@/components/admin/admin-guard";
 
+interface AIConfig {
+  enabled: boolean;
+  provider: string | null;
+  model: string | null;
+  hasApiKey?: boolean;
+  hasBaseUrl?: boolean;
+}
+
 function SettingsContent() {
   const [isTesting, setIsTesting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"unknown" | "connected" | "error">("unknown");
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [aiConfig, setAIConfig] = useState<AIConfig | null>(null);
+  const [isLoadingAIConfig, setIsLoadingAIConfig] = useState(true);
+
+  // Fetch AI configuration on mount
+  useEffect(() => {
+    async function fetchAIConfig() {
+      try {
+        const response = await fetch("/api/ai/config");
+        const config = await response.json();
+        setAIConfig(config);
+      } catch (error) {
+        console.error("Failed to fetch AI config:", error);
+        setAIConfig({ enabled: false, provider: null, model: null });
+      } finally {
+        setIsLoadingAIConfig(false);
+      }
+    }
+    fetchAIConfig();
+  }, []);
 
   const handleTestConnection = async () => {
     setIsTesting(true);
@@ -154,6 +181,96 @@ function SettingsContent() {
           </CardContent>
         </Card>
 
+        {/* AI Configuration */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              AI Assistant Configuration
+            </CardTitle>
+            <CardDescription>
+              AI settings for meeting transcript analysis. Configure via environment variables.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {isLoadingAIConfig ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Checking AI configuration...</span>
+              </div>
+            ) : aiConfig?.enabled ? (
+              <>
+                {/* Status */}
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  <span className="font-medium text-green-600">AI Assistant Enabled</span>
+                </div>
+
+                {/* Provider */}
+                <div className="space-y-2">
+                  <Label>Provider</Label>
+                  <Input
+                    value={aiConfig.provider || "Unknown"}
+                    disabled
+                    className="font-mono bg-muted capitalize"
+                  />
+                </div>
+
+                {/* Model */}
+                <div className="space-y-2">
+                  <Label>Model</Label>
+                  <Input
+                    value={aiConfig.model || "Unknown"}
+                    disabled
+                    className="font-mono bg-muted"
+                  />
+                </div>
+
+                {/* API Key Status */}
+                <div className="space-y-2">
+                  <Label>API Key</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value="••••••••••••••••••••••••••••••••"
+                      disabled
+                      className="font-mono bg-muted"
+                    />
+                    <Badge variant={aiConfig.hasApiKey ? "secondary" : "destructive"}>
+                      {aiConfig.hasApiKey ? "Configured" : "Missing"}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Base URL (if set) */}
+                {aiConfig.hasBaseUrl && (
+                  <div className="space-y-2">
+                    <Label>Custom Base URL</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value="Custom endpoint configured"
+                        disabled
+                        className="bg-muted"
+                      />
+                      <Badge variant="secondary">Set</Badge>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <AlertCircle className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <h3 className="font-medium mb-1">AI Not Configured</h3>
+                <p className="text-sm text-muted-foreground max-w-sm">
+                  Set <code className="bg-muted px-1 rounded">AI_MODEL</code> and{" "}
+                  <code className="bg-muted px-1 rounded">AI_API_KEY</code> environment variables to enable AI features.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Environment Variables */}
         <Card>
           <CardHeader>
@@ -169,7 +286,13 @@ VEXA_API_URL=http://localhost:18056
 VEXA_API_KEY=your_api_key_here
 
 # WebSocket URL (public, visible client-side)
-NEXT_PUBLIC_VEXA_WS_URL=ws://localhost:18056/ws`}
+NEXT_PUBLIC_VEXA_WS_URL=ws://localhost:18056/ws
+
+# AI Assistant Configuration (optional)
+# Format: provider/model (e.g., openai/gpt-4o, anthropic/claude-3-opus-20240229)
+AI_MODEL=openai/gpt-4o
+AI_API_KEY=your_ai_api_key_here
+# AI_BASE_URL=https://custom-endpoint.com/v1  # Optional: for custom providers`}
             </pre>
           </CardContent>
         </Card>
