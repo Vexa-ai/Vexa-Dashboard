@@ -31,6 +31,7 @@ interface ChatRequest {
 const SYSTEM_PROMPT = `You are a helpful AI assistant specialized in analyzing meeting transcripts and conversations. You help users find information, summarize discussions, identify action items, and answer questions based on the transcript content provided.
 
 Guidelines:
+- Always respond in the same language as the user's message
 - Answer questions based on the transcript context provided
 - If the answer is not in the transcripts, clearly state that
 - When referencing specific parts of conversations, mention the speaker's name when available
@@ -166,7 +167,7 @@ export async function POST(request: Request) {
       },
     });
 
-    return result.toTextStreamResponse();
+    return result.toUIMessageStreamResponse();
   } catch (error) {
     console.error("Chat API error:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
