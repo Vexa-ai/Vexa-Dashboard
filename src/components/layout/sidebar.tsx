@@ -14,6 +14,7 @@ import {
   Shield,
   LogOut,
   Lock,
+  Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -34,6 +35,7 @@ const navigation = [
 
 const adminNavigation = [
   { name: "Users", href: "/admin/users", icon: Users },
+  { name: "Bots", href: "/admin/bots", icon: Bot },
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
