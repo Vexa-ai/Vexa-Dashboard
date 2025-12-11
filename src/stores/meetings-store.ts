@@ -18,7 +18,8 @@ interface MeetingsState {
 
   // Actions
   fetchMeetings: () => Promise<void>;
-  fetchMeeting: (id: string) => Promise<void>;
+  fetchMeeting: (id: string, options?: { silent?: boolean }) => Promise<void>;
+  refreshMeeting: (id: string) => Promise<void>;
   fetchTranscripts: (platform: Platform, nativeId: string) => Promise<void>;
   setCurrentMeeting: (meeting: Meeting | null) => void;
   clearCurrentMeeting: () => void;
@@ -61,11 +62,17 @@ export const useMeetingsStore = create<MeetingsState>((set, get) => ({
   },
 
   // Fetch single meeting (from list since API doesn't support /meetings/{id})
-  fetchMeeting: async (id: string) => {
-    set({ isLoadingMeeting: true, error: null });
+  // Use silent: true to avoid showing loading state (for polling/refresh)
+  fetchMeeting: async (id: string, options?: { silent?: boolean }) => {
+    const { silent = false } = options || {};
+
+    // Only show loading state on initial load (when no currentMeeting exists)
+    if (!silent) {
+      set({ isLoadingMeeting: true, error: null });
+    }
+
     try {
       // Always fetch fresh data from the API to ensure we have the latest meeting state
-      // This is important for newly created meetings where the cached data might be stale
       const meetings = await vexaAPI.getMeetings();
       meetings.sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -87,6 +94,32 @@ export const useMeetingsStore = create<MeetingsState>((set, get) => ({
         error: (error as Error).message,
         isLoadingMeeting: false
       });
+    }
+  },
+
+  // Silently refresh meeting data (for polling without UI flicker)
+  refreshMeeting: async (id: string) => {
+    try {
+      const meetings = await vexaAPI.getMeetings();
+      meetings.sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      const meeting = meetings.find((m) => m.id.toString() === id);
+
+      if (meeting) {
+        // Only update if something changed
+        const { currentMeeting } = get();
+        if (currentMeeting?.status !== meeting.status ||
+            currentMeeting?.updated_at !== meeting.updated_at) {
+          set({ meetings, currentMeeting: meeting });
+        } else {
+          set({ meetings });
+        }
+      }
+    } catch (error) {
+      // Silent refresh - don't show errors for polling failures
+      console.error("Failed to refresh meeting:", error);
     }
   },
 

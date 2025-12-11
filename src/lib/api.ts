@@ -80,6 +80,7 @@ function mapMeeting(raw: RawMeeting): Meeting {
     bot_container_id: raw.bot_container_id,
     data: raw.data as Meeting["data"],
     created_at: raw.created_at,
+    updated_at: raw.updated_at,
   };
 }
 

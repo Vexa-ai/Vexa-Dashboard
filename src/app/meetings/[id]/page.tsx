@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -41,13 +41,17 @@ export default function MeetingDetailPage() {
     isLoadingTranscripts,
     error,
     fetchMeeting,
+    refreshMeeting,
     fetchTranscripts,
     clearCurrentMeeting,
   } = useMeetingsStore();
 
-  const { titles, setTitle, getTitle } = useMeetingTitlesStore();
+  const { setTitle, getTitle } = useMeetingTitlesStore();
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState("");
+
+  // Track if initial load is complete to prevent animation replays
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     if (meetingId) {
@@ -56,10 +60,19 @@ export default function MeetingDetailPage() {
 
     return () => {
       clearCurrentMeeting();
+      hasLoadedRef.current = false;
     };
   }, [meetingId, fetchMeeting, clearCurrentMeeting]);
 
+  // Mark as loaded once we have data
+  useEffect(() => {
+    if (currentMeeting && !hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+    }
+  }, [currentMeeting]);
+
   // Auto-refresh for early states (requested, joining, awaiting_admission)
+  // Uses refreshMeeting for silent updates without UI flicker
   useEffect(() => {
     const isEarlyState =
       currentMeeting?.status === "requested" ||
@@ -69,11 +82,11 @@ export default function MeetingDetailPage() {
     if (!isEarlyState || !meetingId) return;
 
     const interval = setInterval(() => {
-      fetchMeeting(meetingId);
+      refreshMeeting(meetingId);
     }, 3000); // Poll every 3 seconds
 
     return () => clearInterval(interval);
-  }, [currentMeeting?.status, meetingId, fetchMeeting]);
+  }, [currentMeeting?.status, meetingId, refreshMeeting]);
 
   // Fetch transcripts when meeting is loaded
   useEffect(() => {
@@ -251,7 +264,7 @@ export default function MeetingDetailPage() {
         <div className="order-1 lg:order-2">
           <div className="lg:sticky lg:top-6 space-y-6">
           {/* Meeting Info */}
-          <Card className="animate-fade-in">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Video className="h-4 w-4" />
@@ -315,7 +328,7 @@ export default function MeetingDetailPage() {
           {/* Participants */}
           {currentMeeting.data?.participants &&
             currentMeeting.data.participants.length > 0 && (
-              <Card className="animate-fade-in" style={{ animationDelay: "100ms" }}>
+              <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Users className="h-4 w-4" />
@@ -339,7 +352,7 @@ export default function MeetingDetailPage() {
             )}
 
           {/* Stats */}
-          <Card className="animate-fade-in" style={{ animationDelay: "200ms" }}>
+          <Card>
             <CardHeader>
               <CardTitle>Stats</CardTitle>
             </CardHeader>

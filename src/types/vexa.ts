@@ -20,6 +20,7 @@ export interface Meeting {
   bot_container_id: string | null;
   data: MeetingData;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface MeetingData {
