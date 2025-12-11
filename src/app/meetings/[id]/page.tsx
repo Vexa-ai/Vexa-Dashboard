@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -14,6 +14,7 @@ import {
   Pencil,
   Check,
   X,
+  Sparkles,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,9 +25,12 @@ import { Input } from "@/components/ui/input";
 import { ErrorState } from "@/components/ui/error-state";
 import { TranscriptViewer } from "@/components/transcript/transcript-viewer";
 import { BotStatusIndicator, BotFailedIndicator } from "@/components/meetings/bot-status-indicator";
+import { AIChatPanel } from "@/components/ai";
 import { useMeetingsStore } from "@/stores/meetings-store";
 import { useMeetingTitlesStore } from "@/stores/meeting-titles-store";
+import { useLiveTranscripts } from "@/hooks/use-live-transcripts";
 import { PLATFORM_CONFIG, MEETING_STATUS_CONFIG } from "@/types/vexa";
+import type { MeetingStatus } from "@/types/vexa";
 import { cn } from "@/lib/utils";
 
 export default function MeetingDetailPage() {
@@ -52,6 +56,28 @@ export default function MeetingDetailPage() {
 
   // Track if initial load is complete to prevent animation replays
   const hasLoadedRef = useRef(false);
+
+  // Handle meeting status change from WebSocket
+  const handleStatusChange = useCallback((status: MeetingStatus) => {
+    // If meeting ended, refresh to get final data
+    if (status === "completed" || status === "failed") {
+      fetchMeeting(meetingId);
+    }
+  }, [fetchMeeting, meetingId]);
+
+  // Live transcripts via WebSocket (only when meeting is active)
+  const {
+    isConnecting: wsConnecting,
+    isConnected: wsConnected,
+    connectionError: wsError,
+    reconnectAttempts,
+  } = useLiveTranscripts({
+    platform: currentMeeting?.platform ?? "google_meet",
+    nativeId: currentMeeting?.platform_specific_id ?? "",
+    meetingId: meetingId,
+    isActive: currentMeeting?.status === "active",
+    onStatusChange: handleStatusChange,
+  });
 
   useEffect(() => {
     if (meetingId) {
@@ -220,6 +246,19 @@ export default function MeetingDetailPage() {
               </Badge>
             </div>
           </div>
+          {/* AI Chat Button */}
+          {(currentMeeting.status === "active" || currentMeeting.status === "completed") && transcripts.length > 0 && (
+            <AIChatPanel
+              meeting={currentMeeting}
+              transcripts={transcripts}
+              trigger={
+                <Button className="gap-2 shrink-0">
+                  <Sparkles className="h-4 w-4" />
+                  Ask AI
+                </Button>
+              }
+            />
+          )}
         </div>
       </div>
 
@@ -256,6 +295,10 @@ export default function MeetingDetailPage() {
               segments={transcripts}
               isLoading={isLoadingTranscripts}
               isLive={currentMeeting.status === "active"}
+              wsConnecting={wsConnecting}
+              wsConnected={wsConnected}
+              wsError={wsError}
+              wsReconnectAttempts={reconnectAttempts}
             />
           )}
         </div>
