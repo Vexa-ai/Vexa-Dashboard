@@ -52,7 +52,7 @@ export async function sendEmail({ to, subject, html, text }: SendEmailOptions): 
  * Send magic link email for authentication
  */
 export async function sendMagicLinkEmail(email: string, magicLink: string): Promise<void> {
-  const appName = "Vexa Dashboard";
+  const appName = "Vexa";
 
   const html = `
     <!DOCTYPE html>
@@ -62,53 +62,69 @@ export async function sendMagicLinkEmail(email: string, magicLink: string): Prom
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Sign in to ${appName}</title>
       </head>
-      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">🎙️ ${appName}</h1>
-        </div>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #fff; margin: 0; padding: 0;">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #fff;">
+          <tr>
+            <td align="center" style="padding: 40px 20px;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 480px;">
+                <!-- Logo -->
+                <tr>
+                  <td style="padding-bottom: 32px;">
+                    <span style="font-size: 24px; font-weight: 700; color: #000;">${appName}</span>
+                  </td>
+                </tr>
 
-        <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e5e7eb; border-top: none;">
-          <h2 style="color: #1f2937; margin-top: 0;">Sign in to your account</h2>
+                <!-- Main content -->
+                <tr>
+                  <td style="padding-bottom: 24px;">
+                    <p style="margin: 0; font-size: 14px; line-height: 24px; color: #000;">
+                      Click the button below to sign in to your ${appName} account. This link will expire in 15 minutes.
+                    </p>
+                  </td>
+                </tr>
 
-          <p style="color: #4b5563;">
-            Click the button below to sign in to ${appName}. This link will expire in 15 minutes.
-          </p>
+                <!-- Button -->
+                <tr>
+                  <td style="padding-bottom: 32px;">
+                    <a href="${magicLink}" style="display: inline-block; background-color: #000; color: #fff; font-size: 14px; font-weight: 500; text-decoration: none; padding: 12px 24px; border-radius: 5px;">Sign in</a>
+                  </td>
+                </tr>
 
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${magicLink}"
-               style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
-              Sign in to ${appName}
-            </a>
-          </div>
+                <!-- Link fallback -->
+                <tr>
+                  <td style="padding-bottom: 32px;">
+                    <p style="margin: 0 0 8px 0; font-size: 14px; line-height: 24px; color: #666;">
+                      Or copy and paste this URL into your browser:
+                    </p>
+                    <p style="margin: 0; font-size: 14px; line-height: 24px; color: #666; word-break: break-all;">
+                      ${magicLink}
+                    </p>
+                  </td>
+                </tr>
 
-          <p style="color: #6b7280; font-size: 14px;">
-            If the button doesn't work, copy and paste this link into your browser:
-          </p>
-          <p style="color: #6b7280; font-size: 12px; word-break: break-all; background: #e5e7eb; padding: 10px; border-radius: 4px;">
-            ${magicLink}
-          </p>
-
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-
-          <p style="color: #9ca3af; font-size: 12px; margin-bottom: 0;">
-            If you didn't request this email, you can safely ignore it.
-            <br>
-            This link will expire in 15 minutes for security reasons.
-          </p>
-        </div>
+                <!-- Footer -->
+                <tr>
+                  <td style="border-top: 1px solid #eaeaea; padding-top: 24px;">
+                    <p style="margin: 0; font-size: 12px; line-height: 20px; color: #666;">
+                      If you didn't request this email, you can safely ignore it.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       </body>
     </html>
   `;
 
-  const text = `
-Sign in to ${appName}
+  const text = `Sign in to ${appName}
 
 Click the link below to sign in to your account. This link will expire in 15 minutes.
 
 ${magicLink}
 
-If you didn't request this email, you can safely ignore it.
-  `;
+If you didn't request this email, you can safely ignore it.`;
 
   await sendEmail({
     to: email,
