@@ -1,52 +1,7 @@
 import { NextResponse } from "next/server";
-import https from "https";
-import http from "http";
 
 // Force dynamic rendering to avoid Next.js fetch caching issues
 export const dynamic = "force-dynamic";
-
-// Helper function to make HTTP/HTTPS requests using native modules
-// This bypasses Next.js's patched fetch which has known issues
-function httpRequest(
-  url: string,
-  options: { headers?: Record<string, string>; timeout?: number } = {}
-): Promise<{ ok: boolean; status: number; data: string }> {
-  return new Promise((resolve, reject) => {
-    const urlObj = new URL(url);
-    const isHttps = urlObj.protocol === "https:";
-    const transport = isHttps ? https : http;
-    const defaultPort = isHttps ? 443 : 80;
-
-    const req = transport.request(
-      {
-        hostname: urlObj.hostname,
-        port: urlObj.port || defaultPort,
-        path: urlObj.pathname + urlObj.search,
-        method: "GET",
-        headers: options.headers || {},
-        timeout: options.timeout || 5000,
-      },
-      (res) => {
-        let data = "";
-        res.on("data", (chunk) => (data += chunk));
-        res.on("end", () => {
-          resolve({
-            ok: res.statusCode !== undefined && res.statusCode >= 200 && res.statusCode < 300,
-            status: res.statusCode || 0,
-            data,
-          });
-        });
-      }
-    );
-
-    req.on("error", reject);
-    req.on("timeout", () => {
-      req.destroy();
-      reject(new Error("Request timeout"));
-    });
-    req.end();
-  });
-}
 
 interface HealthStatus {
   status: "ok" | "degraded" | "error";
@@ -85,7 +40,6 @@ export async function GET() {
   } else {
     // SMTP is optional - direct login mode will be used
     status.checks.smtp.error = "SMTP not configured - using direct login mode";
-    // Don't add SMTP to missingConfig as it's optional
   }
 
   // Check Admin API configuration
@@ -95,27 +49,45 @@ export async function GET() {
   if (adminApiKey && adminApiKey !== "your_admin_api_key_here") {
     status.checks.adminApi.configured = true;
 
-    // Test Admin API reachability
+    // Test Admin API reachability - check if the /admin/users endpoint exists
     if (adminApiUrl) {
       try {
-        const url = `${adminApiUrl}/admin/users?limit=1`;
-        const response = await httpRequest(url, {
-          headers: { "X-Admin-API-Key": adminApiKey },
-          timeout: 10000,
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        if (response.ok || response.status === 401) {
-          // 401 means API is reachable but key might be wrong
-          status.checks.adminApi.reachable = response.ok;
-          if (response.status === 401) {
-            status.checks.adminApi.error = "Invalid admin API key";
-          }
+        const response = await fetch(`${adminApiUrl}/admin/users?limit=1`, {
+          method: "GET",
+          headers: { "X-Admin-API-Key": adminApiKey },
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        // Check response status
+        if (response.status === 200) {
+          status.checks.adminApi.reachable = true;
+        } else if (response.status === 401) {
+          status.checks.adminApi.reachable = true; // Server is up but key is wrong
+          status.checks.adminApi.error = "Invalid admin API key";
+        } else if (response.status === 403) {
+          status.checks.adminApi.reachable = true;
+          status.checks.adminApi.error = "Access forbidden";
+        } else if (response.status === 404) {
+          // Admin endpoints not found - likely only Bot Manager is deployed
+          status.checks.adminApi.reachable = false;
+          status.checks.adminApi.error = "Admin API endpoints not found. Ensure Vexa admin service is running.";
+        } else if (response.status >= 500) {
+          status.checks.adminApi.reachable = false;
+          status.checks.adminApi.error = `Server error: ${response.status}`;
         } else {
-          status.checks.adminApi.error = `API returned ${response.status}`;
+          status.checks.adminApi.reachable = true;
         }
       } catch (error) {
         const err = error as Error;
-        status.checks.adminApi.error = `Cannot reach API: ${err.message || "unknown error"}`;
+        if (err.name === "AbortError") {
+          status.checks.adminApi.error = "Connection timeout";
+        } else {
+          status.checks.adminApi.error = `Cannot reach API: ${err.message || "unknown error"}`;
+        }
       }
     }
   } else {
@@ -129,17 +101,29 @@ export async function GET() {
   if (vexaApiUrl) {
     status.checks.vexaApi.configured = true;
 
-    // Test Vexa API reachability using /docs endpoint (Vexa API has Swagger docs)
+    // Test Vexa API reachability - check root endpoint
     try {
-      const response = await httpRequest(`${vexaApiUrl}/docs`, { timeout: 5000 });
-      // Consider any non-5xx response as reachable (200, 301, 404 all mean the server is up)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const response = await fetch(`${vexaApiUrl}/`, {
+        method: "GET",
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      // Any response < 500 means server is reachable
       status.checks.vexaApi.reachable = response.status < 500;
       if (response.status >= 500) {
-        status.checks.vexaApi.error = `API returned ${response.status}`;
+        status.checks.vexaApi.error = `Server error: ${response.status}`;
       }
     } catch (error) {
       const err = error as Error;
-      status.checks.vexaApi.error = `Cannot reach API: ${err.message || "unknown error"}`;
+      if (err.name === "AbortError") {
+        status.checks.vexaApi.error = "Connection timeout";
+      } else {
+        status.checks.vexaApi.error = `Cannot reach API: ${err.message || "unknown error"}`;
+      }
     }
   } else {
     status.checks.vexaApi.error = "Vexa API URL not configured";

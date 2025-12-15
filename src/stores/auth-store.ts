@@ -34,7 +34,7 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       token: null,
-      isLoading: true, // Start with true to prevent flash redirect before hydration
+      isLoading: false, // Changed to false - hydration handled by onRehydrateStorage
       isAuthenticated: false,
 
       sendMagicLink: async (email: string): Promise<LoginResult> => {
