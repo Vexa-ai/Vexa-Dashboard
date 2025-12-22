@@ -275,7 +275,7 @@ export function MCPConfigButton() {
           alt="MCP"
           width={16}
           height={16}
-          className="object-contain"
+          className="object-contain dark:invert"
           onError={() => setMcpIconError(true)}
         />
       </div>

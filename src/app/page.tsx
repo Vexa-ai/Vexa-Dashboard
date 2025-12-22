@@ -57,7 +57,7 @@ export default function DashboardPage() {
                 alt="Discord"
                 width={20}
                 height={20}
-                className="object-contain flex-shrink-0"
+                className="object-contain flex-shrink-0 dark:invert"
               />
               Support
             </a>
@@ -74,7 +74,7 @@ export default function DashboardPage() {
                 alt="GitHub"
                 width={20}
                 height={20}
-                className="object-contain flex-shrink-0"
+                className="object-contain flex-shrink-0 dark:invert"
               />
               Fork me!
             </a>
