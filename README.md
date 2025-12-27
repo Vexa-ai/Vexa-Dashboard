@@ -136,6 +136,11 @@ services:
 | `SMTP_USER` | SMTP username | - |
 | `SMTP_PASS` | SMTP password | - |
 | `SMTP_FROM` | Sender email address | - |
+| `ENABLE_GOOGLE_AUTH` | Enable Google OAuth (`true`/`false`, default: auto-detect from config) | - |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID (required if `ENABLE_GOOGLE_AUTH=true`) | - |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret (required if `ENABLE_GOOGLE_AUTH=true`) | - |
+| `NEXTAUTH_URL` | Base URL for NextAuth (e.g., `http://localhost:3000`) | - |
+| `NEXTAUTH_SECRET` | Secret for NextAuth (can use `VEXA_ADMIN_API_KEY`) | - |
 | `ALLOW_REGISTRATIONS` | Allow new signups | `true` |
 | `ALLOWED_EMAIL_DOMAINS` | Restrict signup domains | All |
 
@@ -158,13 +163,40 @@ AI_BASE_URL=http://localhost:11434/v1
 
 ## 🔐 Authentication Modes
 
-### Direct Login (Default)
+### Google OAuth (Optional - Recommended for Production)
 
-Without SMTP configured, users authenticate with just their email (no verification). Great for development and trusted environments.
+With Google OAuth configured, users can sign in with their Google account. 
+
+**To enable Google OAuth:**
+
+1. Set the flag: `ENABLE_GOOGLE_AUTH=true`
+2. Configure Google OAuth credentials:
+```bash
+ENABLE_GOOGLE_AUTH=true
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your_secret
+```
+
+**Setup Instructions:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Create an OAuth 2.0 Client ID
+3. Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google` (or your production URL)
+4. Copy the Client ID and Client Secret to your environment variables
+5. Set `ENABLE_GOOGLE_AUTH=true` to enable Google authentication
+
+**Note:** If `ENABLE_GOOGLE_AUTH` is not set, Google OAuth will be automatically enabled if all required configuration variables are present (backward compatible behavior). Set `ENABLE_GOOGLE_AUTH=false` to explicitly disable Google OAuth.
 
 ### Magic Link (with SMTP)
 
-With SMTP configured, users receive a secure sign-in link via email. Recommended for production.
+With SMTP configured, users receive a secure sign-in link via email. Recommended if not using Google OAuth.
+
+### Direct Login (Default)
+
+Without SMTP or Google OAuth configured, users authenticate with just their email (no verification). Great for development and trusted environments.
+
+**Note:** When Google OAuth is enabled (via `ENABLE_GOOGLE_AUTH=true` or auto-detected from config), it takes precedence. Email authentication (magic link or direct) will be available as a secondary option. Set `ENABLE_GOOGLE_AUTH=false` to disable Google OAuth and use email authentication only.
 
 ## 💻 Local Development
 

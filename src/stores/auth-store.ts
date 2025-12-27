@@ -150,6 +150,27 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await fetch("/api/auth/me");
           if (response.ok) {
+            // Cookie is valid - try to sync OAuth user info if available
+            if (!user || !token) {
+              try {
+                const oauthResponse = await fetch("/api/auth/oauth-callback");
+                if (oauthResponse.ok) {
+                  const oauthData = await oauthResponse.json();
+                  if (oauthData.user && oauthData.token) {
+                    set({
+                      user: oauthData.user,
+                      token: oauthData.token,
+                      isAuthenticated: true,
+                      isLoading: false,
+                    });
+                    return;
+                  }
+                }
+              } catch {
+                // OAuth callback failed, but cookie is still valid
+                // User might have logged in via email, so just set authenticated
+              }
+            }
             // Cookie is valid, but we don't have user info
             // Keep existing user if any
             set({ isAuthenticated: true, isLoading: false });

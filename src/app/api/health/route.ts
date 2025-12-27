@@ -5,9 +5,10 @@ export const dynamic = "force-dynamic";
 
 interface HealthStatus {
   status: "ok" | "degraded" | "error";
-  authMode: "direct" | "magic-link";
+  authMode: "direct" | "magic-link" | "google";
   checks: {
     smtp: { configured: boolean; optional: boolean; error?: string };
+    googleOAuth: { configured: boolean; optional: boolean; error?: string };
     adminApi: { configured: boolean; reachable: boolean; error?: string };
     vexaApi: { configured: boolean; reachable: boolean; error?: string };
   };
@@ -20,14 +21,36 @@ interface HealthStatus {
 export async function GET() {
   const status: HealthStatus = {
     status: "ok",
-    authMode: "direct", // Will be updated to "magic-link" if SMTP is configured
+    authMode: "direct", // Will be updated based on configured auth methods
     checks: {
       smtp: { configured: false, optional: true },
+      googleOAuth: { configured: false, optional: true },
       adminApi: { configured: false, reachable: false },
       vexaApi: { configured: false, reachable: false },
     },
     missingConfig: [],
   };
+
+  // Check Google OAuth configuration (optional - enables Google auth)
+  const enableGoogleAuth = process.env.ENABLE_GOOGLE_AUTH;
+  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const nextAuthUrl = process.env.NEXTAUTH_URL;
+
+  // Check if explicitly disabled
+  if (enableGoogleAuth === "false" || enableGoogleAuth === "0") {
+    status.checks.googleOAuth.error = "Google OAuth is disabled";
+  } else if (googleClientId && googleClientSecret && nextAuthUrl) {
+    status.checks.googleOAuth.configured = true;
+    status.authMode = "google";
+  } else {
+    // Google OAuth is optional
+    if (enableGoogleAuth === "true" || enableGoogleAuth === "1") {
+      status.checks.googleOAuth.error = "Google OAuth is enabled but configuration is incomplete";
+    } else {
+      status.checks.googleOAuth.error = "Google OAuth not configured";
+    }
+  }
 
   // Check SMTP configuration (optional - enables magic link auth)
   const smtpHost = process.env.SMTP_HOST;
@@ -36,10 +59,13 @@ export async function GET() {
 
   if (smtpHost && smtpUser && smtpPass) {
     status.checks.smtp.configured = true;
-    status.authMode = "magic-link";
+    // Only set to magic-link if Google OAuth is not configured (Google takes precedence)
+    if (!status.checks.googleOAuth.configured) {
+      status.authMode = "magic-link";
+    }
   } else {
-    // SMTP is optional - direct login mode will be used
-    status.checks.smtp.error = "SMTP not configured - using direct login mode";
+    // SMTP is optional - direct login mode will be used if no other auth is configured
+    status.checks.smtp.error = "SMTP not configured";
   }
 
   // Check Admin API configuration
