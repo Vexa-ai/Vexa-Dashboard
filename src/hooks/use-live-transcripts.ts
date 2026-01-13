@@ -297,20 +297,62 @@ export function useLiveTranscripts(
       };
 
       ws.onerror = (event) => {
-        console.error("[LiveTranscripts] WebSocket error:", event);
+        // WebSocket onerror events are often empty - actual error details come from onclose
+        // Only log if we have useful information, otherwise rely on onclose for details
+        const errorInfo = {
+          readyState: ws.readyState,
+          url: ws.url?.replace(/api_key=[^&]+/, 'api_key=***'),
+          protocol: ws.protocol,
+          extensions: ws.extensions,
+          eventType: event.type,
+        };
+        
+        // Check if there's actual error information
+        const hasErrorDetails = (event as any).error || (event as any).message;
+        
+        if (hasErrorDetails) {
+          console.error("[LiveTranscripts] WebSocket error:", {
+            ...errorInfo,
+            error: (event as any).error,
+            message: (event as any).message,
+          });
+        } else {
+          // Empty error event - just log state, actual error will be in onclose
+          console.warn("[LiveTranscripts] WebSocket error event (details will be in onclose):", errorInfo);
+        }
+        
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/a89f31ed-bb1b-47a2-9c8c-c03467b63bbc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-live-transcripts.ts:271',message:'WebSocket error event',data:{readyState:ws.readyState,url:ws.url?.replace(/api_key=[^&]+/,'api_key=***'),protocol:ws.protocol,extensions:ws.extensions,eventType:event.type,hasError:!!(event as any).error,errorMessage:(event as any).error?.message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/a89f31ed-bb1b-47a2-9c8c-c03467b63bbc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-live-transcripts.ts:299',message:'WebSocket error event',data:{...errorInfo,hasErrorDetails:!!hasErrorDetails,errorMessage:(event as any).error?.message||(event as any).message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
         // #endregion
+        
         if (!mountedRef.current) return;
-        setConnectionError("Connection error");
+        // Don't set connection error here - wait for onclose which has actual error codes
+        // setConnectionError will be set in onclose with more details
       };
 
       ws.onclose = (event) => {
         if (!mountedRef.current) return;
 
-        console.log("[LiveTranscripts] Disconnected:", event.code, event.reason);
+        // onclose provides the actual error information (code and reason)
+        const closeInfo = {
+          code: event.code,
+          reason: event.reason || 'No reason provided',
+          wasClean: event.wasClean,
+          readyState: ws.readyState,
+        };
+
+        // Log with appropriate level based on whether it was clean or not
+        if (event.wasClean) {
+          console.log("[LiveTranscripts] Disconnected cleanly:", closeInfo);
+        } else {
+          // Unclean close indicates an error - log as warning/error
+          const errorMessage = event.reason || `Connection closed unexpectedly (code: ${event.code})`;
+          console.warn("[LiveTranscripts] Connection closed with error:", closeInfo);
+          setConnectionError(errorMessage);
+        }
+        
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/a89f31ed-bb1b-47a2-9c8c-c03467b63bbc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-live-transcripts.ts:277',message:'WebSocket closed',data:{code:event.code,reason:event.reason,wasClean:event.wasClean,readyState:ws.readyState},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/a89f31ed-bb1b-47a2-9c8c-c03467b63bbc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-live-transcripts.ts:308',message:'WebSocket closed',data:closeInfo,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I'})}).catch(()=>{});
         // #endregion
         setIsConnecting(false);
         setIsConnected(false);

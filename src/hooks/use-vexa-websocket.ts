@@ -8,6 +8,7 @@ import type {
   MeetingStatus,
 } from "@/types/vexa";
 import { useLiveStore } from "@/stores/live-store";
+import { vexaAPI } from "@/lib/api";
 
 interface UseVexaWebSocketOptions {
   platform: Platform;
@@ -71,8 +72,11 @@ export function useVexaWebSocket(
     connectionError,
     setConnectionState,
     addLiveTranscript,
+    bootstrapLiveTranscripts,
     setBotStatus,
   } = useLiveStore();
+
+  const bootstrappedRef = useRef(false);
 
   const cleanup = useCallback(() => {
     if (pingIntervalRef.current) {
@@ -113,6 +117,7 @@ export function useVexaWebSocket(
                   text: seg.text,
                   speaker: seg.speaker || "Unknown",
                   language: seg.language || "en",
+                  completed: seg.completed,
                   session_uid: seg.session_uid || "",
                   created_at: seg.absolute_start_time,
                   updated_at: seg.updated_at,
@@ -152,6 +157,25 @@ export function useVexaWebSocket(
     [nativeId, addLiveTranscript, setBotStatus, onTranscript, onStatusChange, onError]
   );
 
+  // Bootstrap transcripts from REST API before connecting
+  const bootstrapFromRest = useCallback(async () => {
+    if (bootstrappedRef.current) return;
+
+    try {
+      console.log(`[VexaWebSocket] Bootstrapping transcripts from REST API: ${platform}/${nativeId}`);
+      const segments = await vexaAPI.getTranscripts(platform, nativeId);
+      console.log(`[VexaWebSocket] Bootstrapped ${segments.length} segments from REST API`);
+      
+      // Bootstrap the live transcripts store
+      bootstrapLiveTranscripts(segments);
+      bootstrappedRef.current = true;
+    } catch (error) {
+      console.error("[VexaWebSocket] Bootstrap from REST API failed:", error);
+      // Continue anyway - WebSocket will provide segments
+      bootstrappedRef.current = true;
+    }
+  }, [platform, nativeId, bootstrapLiveTranscripts]);
+
   const connect = useCallback(async () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       return;
@@ -160,6 +184,9 @@ export function useVexaWebSocket(
     cleanup();
     shouldReconnectRef.current = true;
     setConnectionState(true, false);
+
+    // Bootstrap transcripts from REST API before connecting
+    await bootstrapFromRest();
 
     const config = await fetchConfig();
     const wsUrl = buildWsUrl(config.wsUrl, config.authToken);
@@ -220,12 +247,13 @@ export function useVexaWebSocket(
       setConnectionState(false, false, (error as Error).message);
       onError?.((error as Error).message);
     }
-  }, [platform, nativeId, handleMessage, cleanup, setConnectionState, onError]);
+  }, [platform, nativeId, handleMessage, cleanup, setConnectionState, onError, bootstrapFromRest]);
 
   const disconnect = useCallback(() => {
     shouldReconnectRef.current = false;
     cleanup();
     setConnectionState(false, false);
+    bootstrappedRef.current = false; // Reset bootstrap flag on disconnect
   }, [cleanup, setConnectionState]);
 
   // Auto-connect on mount if enabled

@@ -244,11 +244,25 @@ export const useMeetingsStore = create<MeetingsState>((set, get) => ({
 
       const existing = transcriptMap.get(absStart);
 
-      // Deduplication: keep segment with newer updated_at timestamp
-      if (existing && existing.updated_at && segment.updated_at) {
-        // If existing is newer, skip this segment
-        if (existing.updated_at >= segment.updated_at) {
+      // For real-time updates: always update if text is different, regardless of timestamp
+      // This ensures that segment changes are reflected immediately
+      if (existing) {
+        // If text is different (trimmed comparison for accuracy), always update (real-time transcription update)
+        const existingText = (existing.text || "").trim();
+        const newText = (segment.text || "").trim();
+        const completedChanged = Boolean((existing as any).completed) !== Boolean((segment as any).completed);
+        if (existingText !== newText || completedChanged) {
+          transcriptMap.set(absStart, segment);
+          hasUpdates = true;
           continue;
+        }
+        
+        // If text is the same, use timestamp-based deduplication
+        if (existing.updated_at && segment.updated_at) {
+          // If existing is newer, skip this segment
+          if (existing.updated_at >= segment.updated_at) {
+            continue;
+          }
         }
       }
 

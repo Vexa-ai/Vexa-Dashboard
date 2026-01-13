@@ -18,6 +18,7 @@ interface LiveMeetingState {
   setActiveMeeting: (meeting: Meeting | null) => void;
   addLiveTranscript: (segment: TranscriptSegment) => void;
   updateLiveTranscript: (segment: TranscriptSegment) => void;
+  bootstrapLiveTranscripts: (segments: TranscriptSegment[]) => void;
   setBotStatus: (status: MeetingStatus) => void;
   setConnectionState: (isConnecting: boolean, isConnected: boolean, error?: string) => void;
   clearLiveSession: () => void;
@@ -48,15 +49,28 @@ export const useLiveStore = create<LiveMeetingState>((set, get) => ({
     );
 
     if (existingIndex !== -1) {
-      // Update existing segment if newer
+      // Update existing segment
       const existing = liveTranscripts[existingIndex];
-      if (segment.updated_at && existing.updated_at) {
+      
+      // For real-time updates: always update if text is different, regardless of timestamp
+      // This ensures that segment changes are reflected immediately
+      const existingText = (existing.text || "").trim();
+      const newText = (segment.text || "").trim();
+      const completedChanged = Boolean(existing.completed) !== Boolean(segment.completed);
+      if (existingText !== newText || completedChanged) {
+        // Text changed - always update (real-time transcription update)
+        const updated = [...liveTranscripts];
+        updated[existingIndex] = segment;
+        set({ liveTranscripts: updated });
+      } else if (segment.updated_at && existing.updated_at) {
+        // Text is the same - use timestamp-based deduplication
         if (new Date(segment.updated_at) > new Date(existing.updated_at)) {
           const updated = [...liveTranscripts];
           updated[existingIndex] = segment;
           set({ liveTranscripts: updated });
         }
       } else {
+        // No timestamps - update anyway (fallback)
         const updated = [...liveTranscripts];
         updated[existingIndex] = segment;
         set({ liveTranscripts: updated });
@@ -76,6 +90,26 @@ export const useLiveStore = create<LiveMeetingState>((set, get) => ({
       t.absolute_start_time === segment.absolute_start_time ? segment : t
     );
     set({ liveTranscripts: updated });
+  },
+
+  bootstrapLiveTranscripts: (segments: TranscriptSegment[]) => {
+    // Filter out segments without absolute_start_time or empty text
+    const validSegments = segments.filter(
+      (seg) => seg.absolute_start_time && seg.text?.trim()
+    );
+
+    // Create a map keyed by absolute_start_time (deduplication key)
+    const transcriptMap = new Map<string, TranscriptSegment>();
+    for (const segment of validSegments) {
+      transcriptMap.set(segment.absolute_start_time, segment);
+    }
+
+    // Convert map to array and sort by start_time
+    const sortedTranscripts = Array.from(transcriptMap.values()).sort(
+      (a, b) => a.start_time - b.start_time
+    );
+
+    set({ liveTranscripts: sortedTranscripts });
   },
 
   setBotStatus: (status: MeetingStatus) => {
