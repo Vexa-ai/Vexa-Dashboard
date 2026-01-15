@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Meeting, TranscriptSegment, Platform, MeetingStatus } from "@/types/vexa";
 import { vexaAPI } from "@/lib/api";
+import { deduplicateOverlappingSegments } from "@/lib/transcript-dedup";
 
 interface MeetingDataUpdate {
   name?: string;
@@ -201,9 +202,12 @@ export const useMeetingsStore = create<MeetingsState>((set, get) => ({
       (a, b) => a.absolute_start_time.localeCompare(b.absolute_start_time)
     );
 
+    // Deduplicate overlapping segments (expansion, tail-repeat, containment)
+    const dedupedTranscripts = deduplicateOverlappingSegments(sortedTranscripts);
+
     // Get the first segment's absolute_start_time to use as meeting start time
-    const firstSegmentTime = sortedTranscripts.length > 0 
-      ? sortedTranscripts[0].absolute_start_time 
+    const firstSegmentTime = dedupedTranscripts.length > 0 
+      ? dedupedTranscripts[0].absolute_start_time 
       : null;
 
     // Update current meeting's start_time if not set and we have a first segment
@@ -216,7 +220,7 @@ export const useMeetingsStore = create<MeetingsState>((set, get) => ({
       : currentMeeting;
 
     set({ 
-      transcripts: sortedTranscripts,
+      transcripts: dedupedTranscripts,
       ...(updatedMeeting !== currentMeeting ? { currentMeeting: updatedMeeting } : {}),
     });
   },
@@ -250,7 +254,7 @@ export const useMeetingsStore = create<MeetingsState>((set, get) => ({
         // If text is different (trimmed comparison for accuracy), always update (real-time transcription update)
         const existingText = (existing.text || "").trim();
         const newText = (segment.text || "").trim();
-        const completedChanged = Boolean((existing as any).completed) !== Boolean((segment as any).completed);
+        const completedChanged = Boolean(existing.completed) !== Boolean(segment.completed);
         if (existingText !== newText || completedChanged) {
           transcriptMap.set(absStart, segment);
           hasUpdates = true;
@@ -276,10 +280,13 @@ export const useMeetingsStore = create<MeetingsState>((set, get) => ({
     const sortedTranscripts = Array.from(transcriptMap.values()).sort(
       (a, b) => a.absolute_start_time.localeCompare(b.absolute_start_time)
     );
+
+    // Deduplicate overlapping segments (expansion, tail-repeat, containment)
+    const dedupedTranscripts = deduplicateOverlappingSegments(sortedTranscripts);
     
     // Get the first segment's absolute_start_time to use as meeting start time
-    const firstSegmentTime = sortedTranscripts.length > 0 
-      ? sortedTranscripts[0].absolute_start_time 
+    const firstSegmentTime = dedupedTranscripts.length > 0 
+      ? dedupedTranscripts[0].absolute_start_time 
       : null;
 
     // Update current meeting's start_time if not set and we have a first segment
@@ -294,7 +301,7 @@ export const useMeetingsStore = create<MeetingsState>((set, get) => ({
     // Update store immediately - Zustand's set() is synchronous, ensuring immediate UI updates
     // Always set to ensure React detects changes (new array reference)
     set({ 
-      transcripts: sortedTranscripts,
+      transcripts: dedupedTranscripts,
       ...(updatedMeeting !== currentMeeting ? { currentMeeting: updatedMeeting } : {}),
     });
   },

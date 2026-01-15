@@ -11,7 +11,9 @@ export function cn(...inputs: ClassValue[]) {
  * which JavaScript would interpret as local time. This function ensures UTC interpretation.
  */
 export function parseUTCTimestamp(timestamp: string): Date {
-  // Append 'Z' if not present to ensure UTC interpretation
-  const utcTimestamp = timestamp.endsWith('Z') ? timestamp : timestamp + 'Z';
-  return new Date(utcTimestamp);
+  // If timestamp already includes timezone info (Z or +HH:MM/-HH:MM), do not modify it.
+  // Otherwise, append 'Z' so JS interprets it as UTC instead of local time.
+  const hasZone =
+    /[zZ]$/.test(timestamp) || /[+-]\d{2}:\d{2}$/.test(timestamp);
+  return new Date(hasZone ? timestamp : `${timestamp}Z`);
 }

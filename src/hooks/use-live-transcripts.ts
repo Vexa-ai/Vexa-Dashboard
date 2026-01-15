@@ -81,6 +81,7 @@ export function useLiveTranscripts(
       text: seg.text,
       speaker: seg.speaker || "Unknown",
       language: seg.language || "en",
+      completed: seg.completed,
       session_uid: seg.session_uid || "",
       created_at: seg.absolute_start_time,
       updated_at: seg.updated_at,

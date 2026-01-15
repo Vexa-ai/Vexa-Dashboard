@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { Meeting, TranscriptSegment, Platform, MeetingStatus } from "@/types/vexa";
+import { deduplicateOverlappingSegments } from "@/lib/transcript-dedup";
 
 interface LiveMeetingState {
   // Current live meeting
@@ -61,26 +62,43 @@ export const useLiveStore = create<LiveMeetingState>((set, get) => ({
         // Text changed - always update (real-time transcription update)
         const updated = [...liveTranscripts];
         updated[existingIndex] = segment;
-        set({ liveTranscripts: updated });
+        // Sort and deduplicate after update
+        const sorted = updated.sort(
+          (a, b) => a.absolute_start_time.localeCompare(b.absolute_start_time)
+        );
+        const deduped = deduplicateOverlappingSegments(sorted);
+        set({ liveTranscripts: deduped });
       } else if (segment.updated_at && existing.updated_at) {
         // Text is the same - use timestamp-based deduplication
         if (new Date(segment.updated_at) > new Date(existing.updated_at)) {
           const updated = [...liveTranscripts];
           updated[existingIndex] = segment;
-          set({ liveTranscripts: updated });
+          // Sort and deduplicate after update
+          const sorted = updated.sort(
+            (a, b) => a.absolute_start_time.localeCompare(b.absolute_start_time)
+          );
+          const deduped = deduplicateOverlappingSegments(sorted);
+          set({ liveTranscripts: deduped });
         }
       } else {
         // No timestamps - update anyway (fallback)
         const updated = [...liveTranscripts];
         updated[existingIndex] = segment;
-        set({ liveTranscripts: updated });
+        // Sort and deduplicate after update
+        const sorted = updated.sort(
+          (a, b) => a.absolute_start_time.localeCompare(b.absolute_start_time)
+        );
+        const deduped = deduplicateOverlappingSegments(sorted);
+        set({ liveTranscripts: deduped });
       }
     } else {
-      // Add new segment and sort by start_time
+      // Add new segment and sort by absolute_start_time
       const updated = [...liveTranscripts, segment].sort(
-        (a, b) => a.start_time - b.start_time
+        (a, b) => a.absolute_start_time.localeCompare(b.absolute_start_time)
       );
-      set({ liveTranscripts: updated });
+      // Deduplicate overlapping segments
+      const deduped = deduplicateOverlappingSegments(updated);
+      set({ liveTranscripts: deduped });
     }
   },
 
@@ -89,7 +107,12 @@ export const useLiveStore = create<LiveMeetingState>((set, get) => ({
     const updated = liveTranscripts.map((t) =>
       t.absolute_start_time === segment.absolute_start_time ? segment : t
     );
-    set({ liveTranscripts: updated });
+    // Sort and deduplicate after update
+    const sorted = updated.sort(
+      (a, b) => a.absolute_start_time.localeCompare(b.absolute_start_time)
+    );
+    const deduped = deduplicateOverlappingSegments(sorted);
+    set({ liveTranscripts: deduped });
   },
 
   bootstrapLiveTranscripts: (segments: TranscriptSegment[]) => {
@@ -104,12 +127,15 @@ export const useLiveStore = create<LiveMeetingState>((set, get) => ({
       transcriptMap.set(segment.absolute_start_time, segment);
     }
 
-    // Convert map to array and sort by start_time
+    // Convert map to array and sort by absolute_start_time
     const sortedTranscripts = Array.from(transcriptMap.values()).sort(
-      (a, b) => a.start_time - b.start_time
+      (a, b) => a.absolute_start_time.localeCompare(b.absolute_start_time)
     );
 
-    set({ liveTranscripts: sortedTranscripts });
+    // Deduplicate overlapping segments (expansion, tail-repeat, containment)
+    const dedupedTranscripts = deduplicateOverlappingSegments(sortedTranscripts);
+
+    set({ liveTranscripts: dedupedTranscripts });
   },
 
   setBotStatus: (status: MeetingStatus) => {

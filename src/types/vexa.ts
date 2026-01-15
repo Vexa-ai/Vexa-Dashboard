@@ -63,6 +63,7 @@ export interface TranscriptSegment {
   text: string;
   speaker: string;
   language: string;
+  completed?: boolean;
   session_uid: string;
   created_at: string;
   updated_at?: string;
