@@ -54,6 +54,7 @@ export default function LoginPage() {
           authMode: "direct",
           checks: {
             smtp: { configured: false, optional: true, error: "Cannot reach server" },
+            googleOAuth: { configured: false, optional: true, error: "Cannot reach server" },
             adminApi: { configured: false, reachable: false, error: "Cannot reach server" },
             vexaApi: { configured: false, reachable: false, error: "Cannot reach server" },
           },
