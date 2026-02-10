@@ -21,7 +21,6 @@ import { useMeetingsStore } from "@/stores/meetings-store";
 import { useRuntimeConfig } from "@/hooks/use-runtime-config";
 import type { Platform, CreateBotRequest } from "@/types/vexa";
 import { LanguagePicker } from "@/components/language-picker";
-import { WHISPER_LANGUAGE_NAMES } from "@/lib/languages";
 import { cn } from "@/lib/utils";
 import { getUserFriendlyError } from "@/lib/error-messages";
 import { DocsLink } from "@/components/docs/docs-link";
@@ -30,7 +29,6 @@ import { DocsLink } from "@/components/docs/docs-link";
 function parseMeetingInput(input: string): { platform: Platform; meetingId: string; passcode?: string } | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
-
   // Google Meet URL patterns
   // https://meet.google.com/abc-defg-hij
   // meet.google.com/abc-defg-hij
@@ -101,13 +99,6 @@ function parseMeetingInput(input: string): { platform: Platform; meetingId: stri
   return null;
 }
 
-// Get browser language code
-function getBrowserLanguage(): string {
-  if (typeof window === "undefined") return "auto";
-
-  const browserLang = navigator.language.split("-")[0].toLowerCase();
-  return WHISPER_LANGUAGE_NAMES[browserLang] ? browserLang : "auto";
-}
 
 export function JoinModal() {
   const router = useRouter();
@@ -250,6 +241,10 @@ export function JoinModal() {
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                       </svg>
                     </div>
+                  ) : parsedInput.platform === "zoom" ? (
+                    <div className="h-6 w-6 rounded-md bg-blue-500 flex items-center justify-center shadow-sm">
+                      <Video className="h-4 w-4 text-white" />
+                    </div>
                   ) : (
                     <div className="h-6 w-6 rounded-md bg-[#5059C9] flex items-center justify-center shadow-sm">
                       <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="currentColor">
@@ -261,7 +256,7 @@ export function JoinModal() {
               )}
               <Input
                 id="meetingInput"
-                placeholder="Paste meeting URL (Google Meet or Teams)..."
+                placeholder="Paste meeting URL (Google Meet, Zoom, or Teams)..."
                 value={meetingInput}
                 onChange={(e) => setMeetingInput(e.target.value)}
                 className={cn(
@@ -271,6 +266,8 @@ export function JoinModal() {
                     isValid
                       ? parsedInput?.platform === "google_meet"
                         ? "border-green-500 focus-visible:ring-green-500/20"
+                        : parsedInput?.platform === "zoom"
+                        ? "border-blue-500 focus-visible:ring-blue-500/20"
                         : "border-[#5059C9] focus-visible:ring-[#5059C9]/20"
                       : "border-orange-500 focus-visible:ring-orange-500/20"
                   )
@@ -283,11 +280,19 @@ export function JoinModal() {
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
                   <div className={cn(
                     "h-6 w-6 rounded-full flex items-center justify-center animate-fade-in",
-                    parsedInput?.platform === "google_meet" ? "bg-green-100 dark:bg-green-950" : "bg-blue-100 dark:bg-blue-950"
+                    parsedInput?.platform === "google_meet"
+                      ? "bg-green-100 dark:bg-green-950"
+                      : parsedInput?.platform === "zoom"
+                      ? "bg-blue-100 dark:bg-blue-950"
+                      : "bg-indigo-100 dark:bg-indigo-950"
                   )}>
                     <svg className={cn(
                       "h-4 w-4",
-                      parsedInput?.platform === "google_meet" ? "text-green-600 dark:text-green-400" : "text-[#5059C9]"
+                      parsedInput?.platform === "google_meet"
+                        ? "text-green-600 dark:text-green-400"
+                        : parsedInput?.platform === "zoom"
+                        ? "text-blue-600 dark:text-blue-400"
+                        : "text-[#5059C9]"
                     )} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
@@ -303,18 +308,22 @@ export function JoinModal() {
                   "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium",
                   parsedInput.platform === "google_meet"
                     ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
-                    : "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                    : parsedInput.platform === "zoom"
+                    ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                    : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
                 )}>
                   {parsedInput.platform === "google_meet" ? (
                     <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                     </svg>
+                  ) : parsedInput.platform === "zoom" ? (
+                    <Video className="h-3 w-3" />
                   ) : (
                     <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M19.98 7.89A2.14 2.14 0 1 0 17.84 10V7.89h2.14zm-5.27 0A2.14 2.14 0 1 0 12.58 10V7.89h2.13zM12.58 14.5h-1.11v-1.8h1.11zm4.13 0h-1.11v-1.8h1.11zM21 11.36v5.5a3 3 0 0 1-3 3h-3.86v-4.5H12.5v4.5H8.64v-4.5h-1.78a3 3 0 0 1-3-3v-5.5a3 3 0 0 1 3-3h11.14a3 3 0 0 1 3 3z"/>
                     </svg>
                   )}
-                  {parsedInput.platform === "google_meet" ? "Google Meet" : "Microsoft Teams"}
+                  {parsedInput.platform === "google_meet" ? "Google Meet" : parsedInput.platform === "zoom" ? "Zoom" : "Microsoft Teams"}
                 </span>
                 <span className="font-mono text-xs bg-muted px-2 py-1 rounded-md truncate max-w-[200px]">
                   {parsedInput.meetingId}
@@ -371,11 +380,11 @@ export function JoinModal() {
                 />
               </div>
 
-              {/* Passcode for Teams */}
-              {platform === "teams" && (
+              {/* Passcode for Teams and Zoom */}
+              {(platform === "teams" || platform === "zoom") && (
                 <div className="space-y-2">
                   <Label htmlFor="passcode" className="text-sm">
-                    Passcode (required for Teams)
+                    Passcode {platform === "teams" ? "(required for Teams)" : "(optional for Zoom)"}
                   </Label>
                   <Input
                     id="passcode"
