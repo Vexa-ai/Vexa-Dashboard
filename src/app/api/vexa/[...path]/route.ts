@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function proxyRequest(
   request: NextRequest,
   params: Promise<{ path: string[] }>,
@@ -17,7 +20,8 @@ async function proxyRequest(
 
   const { path } = await params;
   const pathString = path.join("/");
-  const url = `${VEXA_API_URL}/${pathString}`;
+  const search = request.nextUrl.search;
+  const url = `${VEXA_API_URL}/${pathString}${search}`;
 
   const headers: HeadersInit = {
     "Content-Type": "application/json",
@@ -40,16 +44,26 @@ async function proxyRequest(
       }
     }
 
-    const response = await fetch(url, fetchOptions);
+    const response = await fetch(url, {
+      ...fetchOptions,
+      cache: "no-store",
+      next: { revalidate: 0 },
+    });
 
     // Handle empty responses
     const contentType = response.headers.get("content-type");
     if (response.status === 204 || !contentType?.includes("application/json")) {
-      return new NextResponse(null, { status: response.status });
+      return new NextResponse(null, {
+        status: response.status,
+        headers: { "Cache-Control": "no-store" },
+      });
     }
 
     const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
+    return NextResponse.json(data, {
+      status: response.status,
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     console.error(`Proxy error for ${method} ${url}:`, error);
     return NextResponse.json(
