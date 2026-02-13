@@ -38,6 +38,10 @@ Backend requirements:
 Notes:
 - The dashboard fetches audio through its own `/api/vexa/...` proxy to avoid MinIO/S3 CORS issues.
 
+## Zoom Notes
+
+Zoom meeting joins require additional setup in the Vexa backend (Zoom Meeting SDK + OAuth/OBF). See the Vexa repo doc: `docs/zoom-app-setup.md`.
+
 ## Required Configuration
 
 | Variable | Required | Notes |
