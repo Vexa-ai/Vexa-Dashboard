@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { Meeting, TranscriptSegment, Platform, MeetingStatus, RecordingData, ChatMessage } from "@/types/vexa";
-import { vexaAPI } from "@/lib/api";
+import { VexaAPIError, vexaAPI } from "@/lib/api";
 import { deduplicateOverlappingSegments } from "@/lib/transcript-dedup";
 
 interface MeetingDataUpdate {
@@ -58,6 +58,9 @@ interface MeetingsState {
   // Utilities
   clearError: () => void;
 }
+
+let isChatRouteUnavailable = false;
+let hasLoggedChatRouteUnavailable = false;
 
 export const useMeetingsStore = create<MeetingsState>((set, get) => ({
   // Initial state
@@ -385,11 +388,31 @@ export const useMeetingsStore = create<MeetingsState>((set, get) => ({
 
   // Fetch chat messages via REST API (bootstrap)
   fetchChatMessages: async (platform: Platform, nativeId: string) => {
+    if (isChatRouteUnavailable) {
+      return;
+    }
+
     try {
       const result = await vexaAPI.getChatMessages(platform, nativeId);
       set({ chatMessages: result.messages });
     } catch (error) {
-      // Non-fatal — chat may not be available (bot not in meeting, etc.)
+      if (error instanceof VexaAPIError && error.status === 404) {
+        // Backward compatibility: older backends do not expose this endpoint.
+        const isMissingRoute = error.message === "Not Found";
+        if (isMissingRoute) {
+          isChatRouteUnavailable = true;
+          if (!hasLoggedChatRouteUnavailable) {
+            hasLoggedChatRouteUnavailable = true;
+            console.info("[Chat] Chat endpoint is not available on this backend; disabling chat bootstrap fetches.");
+          }
+        }
+
+        // Non-fatal: chat may not exist for this meeting.
+        set({ chatMessages: [] });
+        return;
+      }
+
+      // Non-fatal — chat may not be available (network/auth/transient failures).
       console.error("[Chat] Failed to fetch chat messages:", error);
     }
   },
