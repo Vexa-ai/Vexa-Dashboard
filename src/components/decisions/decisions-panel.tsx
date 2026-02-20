@@ -13,6 +13,8 @@ import {
   Cpu,
   Check,
   X,
+  Lightbulb,
+  Timer,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,7 +31,9 @@ import { cn } from "@/lib/utils";
 export type DecisionItemType =
   | "decision"
   | "action_item"
-  | "architecture_statement";
+  | "architecture_statement"
+  | "key_insight"
+  | "commitment";
 
 export interface DecisionItem {
   id: string; // client-generated UUID
@@ -95,6 +99,16 @@ const TYPE_META: Record<
     label: "Architecture",
     icon: <Cpu className="h-3.5 w-3.5" />,
     badgeClass: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
+  },
+  key_insight: {
+    label: "Key Insight",
+    icon: <Lightbulb className="h-3.5 w-3.5" />,
+    badgeClass: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  },
+  commitment: {
+    label: "Commitment",
+    icon: <Timer className="h-3.5 w-3.5" />,
+    badgeClass: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
   },
 };
 
