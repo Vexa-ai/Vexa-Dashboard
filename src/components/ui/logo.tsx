@@ -12,15 +12,15 @@ interface LogoProps {
 }
 
 const sizeClasses = {
-  sm: "h-6 w-6",
-  md: "h-8 w-8",
-  lg: "h-12 w-12",
+  sm: "h-5 w-5 rounded-[5px]",
+  md: "h-[26px] w-[26px] rounded-[7px]",
+  lg: "h-10 w-10 rounded-[9px]",
 };
 
 const textSizeClasses = {
-  sm: "text-base",
-  md: "text-lg",
-  lg: "text-2xl",
+  sm: "text-[13px]",
+  md: "text-[15px]",
+  lg: "text-xl",
 };
 
 export function Logo({ className, size = "md", showText = false }: LogoProps) {
@@ -59,7 +59,7 @@ export function Logo({ className, size = "md", showText = false }: LogoProps) {
         priority
       />
       {showText && (
-        <span className={cn("font-semibold", textSizeClasses[size])}>Vexa</span>
+        <span className={cn("font-semibold tracking-[-0.01em] text-foreground", textSizeClasses[size])}>vexa</span>
       )}
     </div>
   );

@@ -217,31 +217,21 @@ export function MeetingCard({ meeting }: MeetingCardProps) {
   return (
     <Link href={`/meetings/${meeting.id}`} className="block group" onClick={(e) => isEditingTitle && e.preventDefault()}>
       <Card className={cn(
-        "relative overflow-hidden transition-all duration-300 ease-out",
-        "border-0 shadow-sm hover:shadow-lg",
-        "bg-gradient-to-br from-card to-card/80",
-        "hover:scale-[1.01] hover:-translate-y-0.5",
-        isActive && "ring-2 ring-green-500/30 shadow-green-500/10"
+        "relative overflow-hidden transition-all duration-200",
+        "border border-border hover:border-gray-300",
+        "bg-card",
+        isActive && "ring-1 ring-emerald-400/30"
       )}>
         {/* Platform color accent */}
         <div className={cn(
-          "absolute top-0 left-0 w-1 h-full transition-all duration-300",
-          meeting.platform === "google_meet" ? "bg-green-500" : meeting.platform === "teams" ? "bg-[#5059C9]" : "bg-blue-500",
-          "group-hover:w-1.5"
+          "absolute top-0 left-0 w-1 h-full",
+          meeting.platform === "google_meet" ? "bg-green-500" : meeting.platform === "teams" ? "bg-[#5059C9]" : "bg-blue-500"
         )} />
-
-        {/* Active meeting glow effect */}
-        {isActive && (
-          <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-transparent pointer-events-none" />
-        )}
 
         <div className="py-3 px-4">
           <div className="flex items-center gap-3">
             {/* Platform Icon */}
-            <div className={cn(
-              "flex-shrink-0 relative",
-              "transition-transform duration-300 group-hover:scale-110"
-            )}>
+            <div className="flex-shrink-0 relative">
               <PlatformIcon platform={meeting.platform} className="h-10 w-10 rounded-lg" />
               {/* Active indicator */}
               {isActive && (
@@ -292,11 +282,7 @@ export function MeetingCard({ meeting }: MeetingCardProps) {
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 group/title">
-                      <h3 className={cn(
-                        "font-semibold text-base truncate",
-                        "transition-colors duration-200",
-                        "group-hover:text-primary"
-                      )}>
+                      <h3 className="font-semibold text-base truncate text-foreground">
                         {displayTitle || meeting.platform_specific_id}
                       </h3>
                       <Button
@@ -407,18 +393,8 @@ export function MeetingCard({ meeting }: MeetingCardProps) {
             </div>
 
             {/* Arrow */}
-            <div className={cn(
-              "flex-shrink-0 self-center",
-              "p-1.5 rounded-full",
-              "transition-all duration-300",
-              "group-hover:bg-primary/10",
-              "group-hover:translate-x-1"
-            )}>
-              <ChevronRight className={cn(
-                "h-4 w-4 text-muted-foreground",
-                "transition-colors duration-200",
-                "group-hover:text-primary"
-              )} />
+            <div className="flex-shrink-0 self-center p-1.5 rounded-full transition-colors group-hover:bg-accent">
+              <ChevronRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
             </div>
           </div>
         </div>

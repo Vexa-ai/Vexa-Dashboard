@@ -87,7 +87,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       <aside
         className={cn(
           // Mobile: fixed, full height, slides in
-          "fixed inset-y-0 left-0 z-50 w-64 bg-background border-r",
+          "fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border",
           "transform transition-transform duration-200 ease-in-out",
           // Desktop: relative, part of flex layout
           "md:relative md:z-0 md:translate-x-0 md:flex md:flex-col md:shrink-0",
@@ -198,7 +198,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </ScrollArea>
 
           {/* Footer */}
-          <div className="border-t p-4 shrink-0 space-y-2">
+          <div className="border-t border-border p-4 shrink-0 space-y-2">
             <a
               href={getDocsUrl("/docs")}
               target="_blank"
@@ -209,12 +209,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               <BookOpen className="h-4 w-4" />
               API Docs
             </a>
-            <div>
-              <p className="text-xs text-muted-foreground">
-                Vexa Dashboard v1.0
+            <div className="px-3">
+              <p className="text-[11px] text-muted-foreground">
+                vexa v1.0
               </p>
-              <p className="text-xs text-muted-foreground">
-                Open Source Meeting Transcription
+              <p className="text-[11px] text-muted-foreground">
+                Open Source · API-first
               </p>
             </div>
           </div>

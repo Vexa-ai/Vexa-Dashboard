@@ -72,10 +72,10 @@ export default function MeetingsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold tracking-tight">Meetings</h1>
+            <h1 className="text-2xl font-semibold tracking-[-0.02em] text-foreground">Meetings</h1>
             <DocsLink href="/docs/rest/meetings#list-meetings" />
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Browse and search your meeting transcriptions
           </p>
         </div>

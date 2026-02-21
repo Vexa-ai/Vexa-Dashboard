@@ -233,7 +233,7 @@ export default function TrackerPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-foreground flex items-center gap-2">
             <Zap className="h-7 w-7 text-amber-500" />
             Tracker Config
           </h1>

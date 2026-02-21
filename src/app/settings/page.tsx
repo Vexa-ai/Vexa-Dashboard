@@ -94,8 +94,8 @@ function SettingsContent() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-foreground">Settings</h1>
+        <p className="text-sm text-muted-foreground">
           Configure your Vexa Dashboard connection
         </p>
       </div>

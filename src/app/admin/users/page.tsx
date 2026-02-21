@@ -86,7 +86,7 @@ export default function AdminUsersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-foreground flex items-center gap-3">
             <Users className="h-8 w-8" />
             Users
           </h1>
