@@ -21,10 +21,11 @@ type LoginState = "onboarding" | "email" | "sent";
 
 interface HealthStatus {
   status: "ok" | "degraded" | "error";
-  authMode: "direct" | "magic-link" | "google";
+  authMode: "direct" | "magic-link" | "google" | "oauth";
   checks: {
     smtp: { configured: boolean; optional?: boolean; error?: string };
     googleOAuth: { configured: boolean; optional?: boolean; error?: string };
+    microsoftOAuth?: { configured: boolean; optional?: boolean; error?: string };
     adminApi: { configured: boolean; reachable: boolean; error?: string };
     vexaApi: { configured: boolean; reachable: boolean; error?: string };
   };
@@ -146,11 +147,25 @@ export default function LoginPage() {
     }
   };
 
+  const handleMicrosoftSignIn = async () => {
+    try {
+      await signIn("microsoft", {
+        callbackUrl: "/",
+        redirect: true,
+      });
+    } catch (error) {
+      console.error("Microsoft sign-in error:", error);
+      toast.error("Failed to sign in with Microsoft");
+    }
+  };
+
   const isConfigError = healthStatus?.status === "error";
   const hasWarnings = healthStatus?.status === "degraded";
   const isDirectMode = healthStatus?.authMode === "direct";
   const isGoogleAuthEnabled = healthStatus?.checks.googleOAuth.configured === true;
-  const isEmailAuthEnabled = !isGoogleAuthEnabled && (healthStatus?.authMode === "magic-link" || healthStatus?.authMode === "direct");
+  const isMicrosoftAuthEnabled = healthStatus?.checks.microsoftOAuth?.configured === true;
+  const isOAuthEnabled = isGoogleAuthEnabled || isMicrosoftAuthEnabled;
+  const isEmailAuthEnabled = !isOAuthEnabled && (healthStatus?.authMode === "magic-link" || healthStatus?.authMode === "direct");
 
   // Landing page onboarding state
   if (state === "onboarding") {
@@ -351,7 +366,7 @@ export default function LoginPage() {
 
             {/* Microsoft Auth */}
             <button
-              onClick={handleGoogleSignIn}
+              onClick={handleMicrosoftSignIn}
               disabled={isConfigError}
               className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border border-border bg-card hover:bg-accent hover:border-gray-300 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
             >

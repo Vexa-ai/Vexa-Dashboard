@@ -5,10 +5,11 @@ export const dynamic = "force-dynamic";
 
 interface HealthStatus {
   status: "ok" | "degraded" | "error";
-  authMode: "direct" | "magic-link" | "google";
+  authMode: "direct" | "magic-link" | "google" | "oauth";
   checks: {
     smtp: { configured: boolean; optional: boolean; error?: string };
     googleOAuth: { configured: boolean; optional: boolean; error?: string };
+    microsoftOAuth: { configured: boolean; optional: boolean; error?: string };
     adminApi: { configured: boolean; reachable: boolean; error?: string };
     vexaApi: { configured: boolean; reachable: boolean; error?: string };
   };
@@ -25,6 +26,7 @@ export async function GET() {
     checks: {
       smtp: { configured: false, optional: true },
       googleOAuth: { configured: false, optional: true },
+      microsoftOAuth: { configured: false, optional: true },
       adminApi: { configured: false, reachable: false },
       vexaApi: { configured: false, reachable: false },
     },
@@ -52,6 +54,29 @@ export async function GET() {
     }
   }
 
+  // Check Microsoft OAuth configuration (optional - enables Microsoft auth)
+  const enableMicrosoftAuth = process.env.ENABLE_MICROSOFT_AUTH;
+  const microsoftClientId = process.env.MICROSOFT_CLIENT_ID;
+  const microsoftClientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+
+  if (enableMicrosoftAuth === "false" || enableMicrosoftAuth === "0") {
+    status.checks.microsoftOAuth.error = "Microsoft OAuth is disabled";
+  } else if (microsoftClientId && microsoftClientSecret && nextAuthUrl) {
+    status.checks.microsoftOAuth.configured = true;
+    // Use "oauth" when both providers are configured, "google" when only Google
+    if (status.checks.googleOAuth.configured) {
+      status.authMode = "oauth";
+    } else {
+      status.authMode = "oauth";
+    }
+  } else {
+    if (enableMicrosoftAuth === "true" || enableMicrosoftAuth === "1") {
+      status.checks.microsoftOAuth.error = "Microsoft OAuth is enabled but configuration is incomplete";
+    } else {
+      status.checks.microsoftOAuth.error = "Microsoft OAuth not configured";
+    }
+  }
+
   // Check SMTP configuration (optional - enables magic link auth)
   const smtpHost = process.env.SMTP_HOST;
   const smtpUser = process.env.SMTP_USER;
@@ -59,8 +84,8 @@ export async function GET() {
 
   if (smtpHost && smtpUser && smtpPass) {
     status.checks.smtp.configured = true;
-    // Only set to magic-link if Google OAuth is not configured (Google takes precedence)
-    if (!status.checks.googleOAuth.configured) {
+    // Only set to magic-link if no OAuth provider is configured (OAuth takes precedence)
+    if (!status.checks.googleOAuth.configured && !status.checks.microsoftOAuth.configured) {
       status.authMode = "magic-link";
     }
   } else {

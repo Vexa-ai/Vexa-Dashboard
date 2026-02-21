@@ -1,30 +1,25 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import AzureADProvider from "next-auth/providers/azure-ad";
 import { cookies } from "next/headers";
 import { findUserByEmail, createUser, createUserToken } from "@/lib/vexa-admin-api";
 import { getRegistrationConfig, validateEmailForRegistration } from "@/lib/registration";
 
 // Check if Google OAuth is enabled
 const isGoogleAuthEnabled = () => {
-  // Check if explicitly disabled via flag
   const enableGoogleAuth = process.env.ENABLE_GOOGLE_AUTH;
-  if (enableGoogleAuth === "false" || enableGoogleAuth === "0") {
-    return false;
-  }
+  if (enableGoogleAuth === "false" || enableGoogleAuth === "0") return false;
+  const hasConfig = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.NEXTAUTH_URL);
+  if (enableGoogleAuth === "true" || enableGoogleAuth === "1") return hasConfig;
+  return hasConfig;
+};
 
-  // If flag is set to true, or flag is not set (default), check if config is present
-  const hasConfig = !!(
-    process.env.GOOGLE_CLIENT_ID &&
-    process.env.GOOGLE_CLIENT_SECRET &&
-    process.env.NEXTAUTH_URL
-  );
-
-  // If flag is explicitly "true", require config to be present
-  if (enableGoogleAuth === "true" || enableGoogleAuth === "1") {
-    return hasConfig;
-  }
-
-  // Default: enable if config is present (backward compatible)
+// Check if Microsoft OAuth is enabled
+const isMicrosoftAuthEnabled = () => {
+  const enableMicrosoftAuth = process.env.ENABLE_MICROSOFT_AUTH;
+  if (enableMicrosoftAuth === "false" || enableMicrosoftAuth === "0") return false;
+  const hasConfig = !!(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET && process.env.NEXTAUTH_URL);
+  if (enableMicrosoftAuth === "true" || enableMicrosoftAuth === "1") return hasConfig;
   return hasConfig;
 };
 
@@ -38,6 +33,17 @@ export const authOptions: NextAuthOptions = {
           }),
         ]
       : []),
+    ...(isMicrosoftAuthEnabled()
+      ? [
+          AzureADProvider({
+            id: "microsoft",
+            name: "Microsoft",
+            clientId: process.env.MICROSOFT_CLIENT_ID!,
+            clientSecret: process.env.MICROSOFT_CLIENT_SECRET!,
+            tenantId: process.env.MICROSOFT_TENANT_ID || "common",
+          }),
+        ]
+      : []),
   ],
   pages: {
     signIn: "/login",
@@ -46,7 +52,7 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account, profile }) {
       // This callback is called after successful OAuth but before session creation
-      if (account?.provider === "google" && user.email) {
+      if ((account?.provider === "google" || account?.provider === "microsoft") && user.email) {
         try {
           // Step 1: Find or create user in Vexa Admin API
           let vexaUser;
