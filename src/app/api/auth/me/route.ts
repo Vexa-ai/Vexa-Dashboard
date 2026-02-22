@@ -34,10 +34,20 @@ export async function GET() {
       );
     }
 
-    // Token is valid - return success
-    // Note: We don't have user info from just the token
-    // The client should have stored user info from login
-    return NextResponse.json({ authenticated: true });
+    // Token is valid — check for user info from SSO cookie
+    const userInfoStr = cookieStore.get("vexa-user-info")?.value;
+    let userInfo = null;
+    if (userInfoStr) {
+      try {
+        userInfo = JSON.parse(userInfoStr);
+      } catch {}
+    }
+
+    return NextResponse.json({
+      authenticated: true,
+      ...(userInfo && { user: userInfo }),
+      ...(token && { token }),
+    });
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to verify authentication" },

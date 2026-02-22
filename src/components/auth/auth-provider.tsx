@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
+import { savePendingMeetingUrl } from "@/lib/pending-meeting";
 import { Loader2 } from "lucide-react";
 
 // Routes that don't require authentication
@@ -17,6 +18,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const pathname = usePathname();
   const { isAuthenticated, isLoading, checkAuth } = useAuthStore();
   const [shouldRedirect, setShouldRedirect] = useState(false);
+  const meetingUrlCaptured = useRef(false);
+
+  // Capture meetingUrl from query string and save to localStorage before any redirect
+  useEffect(() => {
+    if (meetingUrlCaptured.current) return;
+    meetingUrlCaptured.current = true;
+
+    const params = new URLSearchParams(window.location.search);
+    const meetingUrl = params.get("meetingUrl");
+    if (meetingUrl) {
+      savePendingMeetingUrl(meetingUrl);
+    }
+  }, []);
 
   // Check if current route is public
   const isPublicRoute = publicRoutes.some((route) => pathname?.startsWith(route));
@@ -39,7 +53,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     if (shouldRedirect) {
-      router.push("/login");
+      const externalAuthUrl = process.env.NEXT_PUBLIC_EXTERNAL_AUTH_URL;
+      if (externalAuthUrl) {
+        // SSO: redirect to webapp for authentication
+        const returnUrl = encodeURIComponent(window.location.href);
+        window.location.href = `${externalAuthUrl}?returnUrl=${returnUrl}`;
+      } else {
+        router.push("/login");
+      }
     }
   }, [shouldRedirect, router]);
 

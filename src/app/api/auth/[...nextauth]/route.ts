@@ -4,6 +4,7 @@ import AzureADProvider from "next-auth/providers/azure-ad";
 import { cookies } from "next/headers";
 import { findUserByEmail, createUser, createUserToken } from "@/lib/vexa-admin-api";
 import { getRegistrationConfig, validateEmailForRegistration } from "@/lib/registration";
+import { getVexaCookieOptions } from "@/lib/cookie-utils";
 
 // Check if Google OAuth is enabled
 const isGoogleAuthEnabled = () => {
@@ -101,13 +102,7 @@ export const authOptions: NextAuthOptions = {
 
           // Step 3: Set cookie (same as existing auth flow)
           const cookieStore = await cookies();
-          cookieStore.set("vexa-token", apiToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            maxAge: 60 * 60 * 24 * 30, // 30 days
-            path: "/",
-          });
+          cookieStore.set("vexa-token", apiToken, getVexaCookieOptions());
 
           // Store Vexa user info in the user object for the JWT callback
           (user as any).vexaUser = vexaUser;

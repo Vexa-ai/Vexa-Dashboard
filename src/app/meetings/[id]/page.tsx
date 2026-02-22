@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback, useMemo, type CSSProperties } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { format } from "date-fns";
@@ -26,6 +26,7 @@ import {
   ExternalLink,
   Trash2,
   Zap,
+  Code,
 } from "lucide-react";
 import { AudioPlayer, type AudioPlayerHandle, type AudioFragment } from "@/components/recording/audio-player";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,9 +39,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { ErrorState } from "@/components/ui/error-state";
 import { TranscriptViewer } from "@/components/transcript/transcript-viewer";
 import { BotStatusIndicator, BotFailedIndicator } from "@/components/meetings/bot-status-indicator";
+import { WsEventLog, RestTranscriptsPreview, RestRecordingsPreview } from "@/components/meetings/ws-event-log";
 // ChatPanel removed — chat messages now render inline in TranscriptViewer
 import { AIChatPanel } from "@/components/ai";
 import { useMeetingsStore } from "@/stores/meetings-store";
+import { useAuthStore } from "@/stores/auth-store";
 import { useLiveTranscripts } from "@/hooks/use-live-transcripts";
 import { PLATFORM_CONFIG, getDetailedStatus } from "@/types/vexa";
 import type { MeetingStatus, Meeting } from "@/types/vexa";
@@ -83,6 +86,7 @@ import { DecisionsPanel } from "@/components/decisions/decisions-panel";
 export default function MeetingDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const idParam = (params as { id?: string | string[] } | null)?.id;
   const meetingId = Array.isArray(idParam) ? idParam[0] : (idParam ?? "");
 
@@ -104,9 +108,15 @@ export default function MeetingDetailPage() {
     deleteMeeting,
     clearCurrentMeeting,
   } = useMeetingsStore();
+  const authToken = useAuthStore((s) => s.token);
 
   // Decisions panel state
   const [decisionsOpen, setDecisionsOpen] = useState(false);
+
+  // API view toggle state — default ON when coming from onboarding (?apiView=1)
+  const [apiViewOpen, setApiViewOpen] = useState(() => searchParams?.get("apiView") === "1");
+  const [apiButtonHighlight, setApiButtonHighlight] = useState(false);
+  const apiButtonRef = useRef<HTMLButtonElement>(null);
 
   // Title editing state
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -923,13 +933,41 @@ export default function MeetingDetailPage() {
                     Stop
                   </Button>
                 </AlertDialogTrigger>
-              <AlertDialogContent>
+              <AlertDialogContent className={apiViewOpen ? "sm:max-w-lg" : undefined}>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Stop Transcription?</AlertDialogTitle>
                   <AlertDialogDescription>
                     This will disconnect the bot from the meeting and stop the live transcription. You can still access the transcript after stopping.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+                {apiViewOpen && currentMeeting && (
+                  <div className="rounded-lg overflow-hidden border border-border bg-[#111111] font-mono text-[11px]">
+                    <div className="px-3 py-2 bg-[#1a1a1a] flex items-center justify-between">
+                      <div className="flex items-center gap-[5px]">
+                        <span className="w-2 h-2 rounded-full bg-[#ff5f57]" />
+                        <span className="w-2 h-2 rounded-full bg-[#febc2e]" />
+                        <span className="w-2 h-2 rounded-full bg-[#28c840]" />
+                      </div>
+                      <span className="text-[10px] text-gray-500">DELETE /bots</span>
+                    </div>
+                    <div className="p-3 leading-relaxed">
+                      <div className="text-gray-500 mb-2"># Stop the bot</div>
+                      <div>
+                        <span className="text-gray-300">curl -X </span>
+                        <span className="text-[#fca5a5]">DELETE</span>
+                        <span className="text-gray-300"> \</span>
+                      </div>
+                      <div className="pl-4">
+                        <span className="text-[#6ee7b7]">https://api.vexa.ai/bots/{currentMeeting.platform}/{currentMeeting.platform_specific_id}</span>
+                        <span className="text-gray-300"> \</span>
+                      </div>
+                      <div className="pl-4">
+                        <span className="text-gray-300">-H </span>
+                        <span className="text-[#7dd3fc]">&apos;X-API-Key: {authToken ? `${authToken.slice(0, 8)}...` : "vx_sk_..."}&apos;</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
@@ -945,6 +983,24 @@ export default function MeetingDetailPage() {
             </div>
           )}
 
+          {/* API view toggle */}
+          <Button
+            ref={apiButtonRef}
+            variant={apiViewOpen ? "secondary" : "outline"}
+            size="sm"
+            className={cn(
+              "gap-1.5 h-9 transition-all duration-300",
+              apiButtonHighlight && "ring-2 ring-gray-950 dark:ring-white ring-offset-2 ring-offset-background animate-pulse"
+            )}
+            onClick={() => {
+              setApiViewOpen((v) => !v);
+              setApiButtonHighlight(false);
+            }}
+          >
+            <Code className="h-4 w-4 text-emerald-500" />
+            <span className="hidden sm:inline">API</span>
+          </Button>
+
           {/* Decisions panel toggle */}
           <Button
             variant={decisionsOpen ? "secondary" : "outline"}
@@ -957,6 +1013,31 @@ export default function MeetingDetailPage() {
           </Button>
         </div>
       </div>
+
+      {/* API Tutorial Mode Banner */}
+      {apiViewOpen && (
+        <div className="hidden lg:flex items-center justify-between gap-3 mb-4 px-5 py-3 rounded-xl bg-gray-950 dark:bg-white">
+          <div className="flex items-center gap-3">
+            <span className="w-[7px] h-[7px] rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <span className="text-[13px] font-medium text-white dark:text-gray-950">
+              API Tutorial Mode
+            </span>
+            <span className="text-[13px] text-gray-400 dark:text-gray-500">
+              Showing live API calls & WebSocket events
+            </span>
+          </div>
+          <button
+            className="text-gray-400 hover:text-white dark:hover:text-gray-950 transition-colors p-1"
+            onClick={() => {
+              setApiViewOpen(false);
+              setApiButtonHighlight(true);
+              setTimeout(() => setApiButtonHighlight(false), 3000);
+            }}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Participants List - Desktop Only */}
       {currentMeeting.data?.participants && currentMeeting.data.participants.length > 0 && (
@@ -1289,7 +1370,6 @@ export default function MeetingDetailPage() {
               createdAt={currentMeeting.created_at}
               updatedAt={currentMeeting.updated_at}
               onStopped={() => {
-                // Refresh meeting data after stopping
                 fetchMeeting(meetingId);
               }}
             />
@@ -1326,11 +1406,36 @@ export default function MeetingDetailPage() {
               onSegmentClick={canUseSegmentPlayback ? handleSegmentClick : undefined}
             />
           )}
+
         </div>
 
         {/* Sidebar - sticky on desktop, hidden on mobile */}
         <div className="hidden lg:block order-1 lg:order-2">
           <div className="lg:sticky lg:top-6 space-y-6">
+          {apiViewOpen ? (
+            <>
+            <WsEventLog
+              status={currentMeeting.status}
+              platform={currentMeeting.platform}
+              nativeId={currentMeeting.platform_specific_id}
+              wsConnected={wsConnected}
+              wsConnecting={wsConnecting}
+              segmentCount={transcripts.length}
+            />
+            <RestTranscriptsPreview
+              platform={currentMeeting.platform}
+              nativeId={currentMeeting.platform_specific_id}
+              segmentCount={transcripts.length}
+              token={authToken}
+            />
+            <RestRecordingsPreview
+              platform={currentMeeting.platform}
+              nativeId={currentMeeting.platform_specific_id}
+              token={authToken}
+            />
+            </>
+          ) : (
+          <>
           {/* Meeting Info */}
           <Card>
             <CardHeader>
@@ -1625,6 +1730,8 @@ export default function MeetingDetailPage() {
                 </AlertDialog>
               </CardContent>
             </Card>
+          )}
+          </>
           )}
           </div>
         </div>

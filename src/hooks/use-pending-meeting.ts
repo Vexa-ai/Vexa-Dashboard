@@ -46,7 +46,7 @@ export function usePendingMeeting() {
       vexaAPI.createBot(request).then((meeting) => {
         setActiveMeeting(meeting);
         setCurrentMeeting(meeting);
-        router.push(`/meetings/${meeting.id}`);
+        router.push(`/meetings/${meeting.id}?apiView=1`);
         return meeting;
       }),
       {
