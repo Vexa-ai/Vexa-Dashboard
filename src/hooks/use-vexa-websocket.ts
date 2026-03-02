@@ -9,6 +9,7 @@ import type {
 } from "@/types/vexa";
 import { useLiveStore } from "@/stores/live-store";
 import { vexaAPI } from "@/lib/api";
+import { withBasePath } from "@/lib/base-path";
 
 interface UseVexaWebSocketOptions {
   platform: Platform;
@@ -37,7 +38,7 @@ async function fetchConfig(): Promise<{ wsUrl: string; authToken: string | null 
   if (cachedConfig) return cachedConfig;
 
   try {
-    const response = await fetch("/api/config");
+    const response = await fetch(withBasePath("/api/config"));
     const config = await response.json();
     cachedConfig = { wsUrl: config.wsUrl, authToken: config.authToken };
     return cachedConfig;

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { vexaAPI } from "@/lib/api";
 import { AdminGuard } from "@/components/admin/admin-guard";
+import { withBasePath } from "@/lib/base-path";
 
 interface AIConfig {
   enabled: boolean;
@@ -38,7 +39,7 @@ function SettingsContent() {
     async function fetchConfigs() {
       // Fetch runtime config (WebSocket URL)
       try {
-        const configResponse = await fetch("/api/config");
+        const configResponse = await fetch(withBasePath("/api/config"));
         const config = await configResponse.json();
         setRuntimeConfig(config);
       } catch (error) {
@@ -47,7 +48,7 @@ function SettingsContent() {
 
       // Fetch AI config
       try {
-        const response = await fetch("/api/ai/config");
+        const response = await fetch(withBasePath("/api/ai/config"));
         const config = await response.json();
         setAIConfig(config);
       } catch (error) {

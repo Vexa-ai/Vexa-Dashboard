@@ -5,6 +5,7 @@ import type {
   UpdateUserRequest,
   CreateTokenResponse,
 } from "@/types/vexa";
+import { withBasePath } from "@/lib/base-path";
 
 class AdminAPIError extends Error {
   constructor(
@@ -38,24 +39,24 @@ export const adminAPI = {
   // ==========================================
 
   async getUsers(skip = 0, limit = 100): Promise<VexaUser[]> {
-    const response = await fetch(`/api/admin/users?skip=${skip}&limit=${limit}`);
+    const response = await fetch(withBasePath(`/api/admin/users?skip=${skip}&limit=${limit}`));
     const data = await handleResponse<VexaUser[] | { users: VexaUser[] }>(response);
     // Handle both array and object responses
     return Array.isArray(data) ? data : data.users || [];
   },
 
   async getUser(userId: string): Promise<VexaUserWithTokens> {
-    const response = await fetch(`/api/admin/users/${userId}`);
+    const response = await fetch(withBasePath(`/api/admin/users/${userId}`));
     return handleResponse<VexaUserWithTokens>(response);
   },
 
   async getUserByEmail(email: string): Promise<VexaUser> {
-    const response = await fetch(`/api/admin/users/email/${encodeURIComponent(email)}`);
+    const response = await fetch(withBasePath(`/api/admin/users/email/${encodeURIComponent(email)}`));
     return handleResponse<VexaUser>(response);
   },
 
   async createUser(data: CreateUserRequest): Promise<VexaUser> {
-    const response = await fetch("/api/admin/users", {
+    const response = await fetch(withBasePath("/api/admin/users"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -64,7 +65,7 @@ export const adminAPI = {
   },
 
   async updateUser(userId: string, data: UpdateUserRequest): Promise<VexaUser> {
-    const response = await fetch(`/api/admin/users/${userId}`, {
+    const response = await fetch(withBasePath(`/api/admin/users/${userId}`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -77,7 +78,7 @@ export const adminAPI = {
   // ==========================================
 
   async createToken(userId: string): Promise<CreateTokenResponse> {
-    const response = await fetch(`/api/admin/users/${userId}/tokens`, {
+    const response = await fetch(withBasePath(`/api/admin/users/${userId}/tokens`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });
@@ -85,7 +86,7 @@ export const adminAPI = {
   },
 
   async revokeToken(tokenId: string): Promise<void> {
-    const response = await fetch(`/api/admin/tokens/${tokenId}`, {
+    const response = await fetch(withBasePath(`/api/admin/tokens/${tokenId}`), {
       method: "DELETE",
     });
     if (!response.ok) {
@@ -100,7 +101,7 @@ export const adminAPI = {
 
   async testConnection(): Promise<{ success: boolean; error?: string }> {
     try {
-      const response = await fetch("/api/admin/users?limit=1");
+      const response = await fetch(withBasePath("/api/admin/users?limit=1"));
       if (response.ok) {
         return { success: true };
       }

@@ -31,6 +31,7 @@ import {
 } from "@/lib/export";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { basePath } from "@/lib/base-path";
 
 // Linkify URLs in chat message text — splits text into plain strings and clickable <a> elements
 const URL_REGEX = /(https?:\/\/[^\s<>"')\]]+)/gi;
@@ -677,7 +678,9 @@ export function TranscriptViewer({
       if (response.ok) {
         const share = (await response.json()) as { url: string; share_id?: string };
         if (share?.url) {
-          const publicBase = process.env.NEXT_PUBLIC_TRANSCRIPT_SHARE_BASE_URL?.replace(/\/$/, "");
+          const envPublicBase = process.env.NEXT_PUBLIC_TRANSCRIPT_SHARE_BASE_URL?.replace(/\/$/, "");
+          const defaultPublicBase = `${window.location.origin}${basePath || ""}`;
+          const publicBase = envPublicBase || defaultPublicBase;
           const shareUrl =
             publicBase && share.share_id
               ? `${publicBase}/public/transcripts/${share.share_id}.txt`

@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { withBasePath } from "@/lib/base-path";
 import type { Meeting, TranscriptSegment } from "@/types/vexa";
 
 interface AIChatPanelProps {
@@ -85,7 +86,7 @@ export function AIChatPanel({ meeting, transcripts = [], trigger }: AIChatPanelP
   useEffect(() => {
     async function checkAIConfig() {
       try {
-        const response = await fetch("/api/ai/config");
+        const response = await fetch(withBasePath("/api/ai/config"));
         const config = await response.json();
         setAIConfig(config);
       } catch (error) {
@@ -104,7 +105,7 @@ export function AIChatPanel({ meeting, transcripts = [], trigger }: AIChatPanelP
   // Memoize the transport - no settings needed anymore
   const transport = useMemo(() => {
     return new DefaultChatTransport({
-      api: "/api/ai/chat",
+      api: withBasePath("/api/ai/chat"),
       body: { context },
     });
   }, [context]);
