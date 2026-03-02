@@ -15,6 +15,7 @@ import { getDetailedStatus } from "@/types/vexa";
 import { cn, parseUTCTimestamp } from "@/lib/utils";
 import { useMeetingsStore } from "@/stores/meetings-store";
 import { toast } from "sonner";
+import { withBasePath } from "@/lib/base-path";
 
 interface MeetingCardProps {
   meeting: Meeting;
@@ -24,7 +25,7 @@ interface MeetingCardProps {
 function GoogleMeetIcon({ className }: { className?: string }) {
   return (
     <Image
-      src="/icons/icons8-google-meet-96.png"
+      src={withBasePath("/icons/icons8-google-meet-96.png")}
       alt="Google Meet"
       width={40}
       height={40}
@@ -36,7 +37,7 @@ function GoogleMeetIcon({ className }: { className?: string }) {
 function TeamsIcon({ className }: { className?: string }) {
   return (
     <Image
-      src="/icons/icons8-teams-96.png"
+      src={withBasePath("/icons/icons8-teams-96.png")}
       alt="Microsoft Teams"
       width={40}
       height={40}

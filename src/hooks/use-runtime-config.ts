@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { withBasePath } from "@/lib/base-path";
 
 interface RuntimeConfig {
   wsUrl: string;
@@ -13,7 +14,7 @@ let cachedConfig: RuntimeConfig | null = null;
 let configPromise: Promise<RuntimeConfig> | null = null;
 
 async function fetchConfig(): Promise<RuntimeConfig> {
-  const response = await fetch("/api/config");
+  const response = await fetch(withBasePath("/api/config"));
   if (!response.ok) {
     throw new Error("Failed to fetch runtime config");
   }

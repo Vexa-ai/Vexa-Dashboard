@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { withBasePath } from "@/lib/base-path";
 import { toast } from "sonner";
 
 interface RuntimeConfig {
@@ -37,7 +38,7 @@ export function MCPConfigButton() {
   useEffect(() => {
     async function fetchConfig() {
       try {
-        const response = await fetch("/api/config");
+        const response = await fetch(withBasePath("/api/config"));
         const data = await response.json();
         setConfig(data);
       } catch (error) {
@@ -271,7 +272,7 @@ export function MCPConfigButton() {
     return (
       <div className="mr-2 h-4 w-4 relative flex items-center justify-center">
         <img
-          src="/icons/icons8-mcp-96 (1).png"
+          src={withBasePath("/icons/icons8-mcp-96 (1).png")}
           alt="MCP"
           width={16}
           height={16}

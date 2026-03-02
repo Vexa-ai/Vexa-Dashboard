@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppLayout } from "@/components/layout/app-layout";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { withBasePath } from "@/lib/base-path";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -21,13 +22,13 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "/icons/vexadark.svg",
+        url: withBasePath("/icons/vexadark.svg"),
         type: "image/svg+xml",
       },
     ],
     apple: [
       {
-        url: "/icons/vexadark.svg",
+        url: withBasePath("/icons/vexadark.svg"),
         type: "image/svg+xml",
       },
     ],

@@ -11,6 +11,7 @@ import type {
 } from "@/types/vexa";
 import { useMeetingsStore } from "@/stores/meetings-store";
 import { vexaAPI } from "@/lib/api";
+import { withBasePath } from "@/lib/base-path";
 
 interface UseLiveTranscriptsOptions {
   platform: Platform;
@@ -97,9 +98,9 @@ export function useLiveTranscripts(
 
     try {
       console.log(`[LiveTranscripts] Bootstrapping from REST API: ${platform}/${nativeId}`);
-      const segments = await vexaAPI.getTranscripts(platform, nativeId);
+      const segments = await vexaAPI.getTranscripts(platform, nativeId, meetingId);
       console.log(`[LiveTranscripts] Bootstrapped ${segments.length} segments from REST API`);
-      
+
       // Bootstrap the transcript map (algorithm step 1)
       bootstrapTranscripts(segments);
       bootstrappedRef.current = true;
@@ -108,7 +109,7 @@ export function useLiveTranscripts(
       // Continue anyway - WebSocket will provide segments
       bootstrappedRef.current = true;
     }
-  }, [platform, nativeId, bootstrapTranscripts]);
+  }, [platform, nativeId, meetingId, bootstrapTranscripts]);
 
   // Calculate reconnect delay with exponential backoff
   const getReconnectDelay = useCallback((attempt: number) => {
@@ -159,7 +160,7 @@ export function useLiveTranscripts(
     let wsUrl: string;
     let authToken: string | null = null;
     try {
-      const configResponse = await fetch("/api/config");
+      const configResponse = await fetch(withBasePath("/api/config"));
       const config = await configResponse.json();
       wsUrl = config.wsUrl;
       authToken = config.authToken;

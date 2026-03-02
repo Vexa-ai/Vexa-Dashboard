@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { useAuthStore } from "@/stores/auth-store";
+import { withBasePath } from "@/lib/base-path";
 
 type VerifyState = "verifying" | "success" | "error";
 
@@ -57,7 +58,7 @@ function VerifyContent() {
     }
 
     try {
-      const response = await fetch("/api/auth/verify", {
+      const response = await fetch(withBasePath("/api/auth/verify"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
