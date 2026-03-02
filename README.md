@@ -139,6 +139,10 @@ services:
 | `ENABLE_GOOGLE_AUTH` | Enable Google OAuth (`true`/`false`, default: auto-detect from config) | - |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID (required if `ENABLE_GOOGLE_AUTH=true`) | - |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret (required if `ENABLE_GOOGLE_AUTH=true`) | - |
+| `ENABLE_AZURE_AD_AUTH` | Enable Azure AD/Entra ID OAuth (`true`/`false`, default: auto-detect from config) | - |
+| `AZURE_AD_CLIENT_ID` | Azure AD/Entra ID client ID (required if `ENABLE_AZURE_AD_AUTH=true`) | - |
+| `AZURE_AD_CLIENT_SECRET` | Azure AD/Entra ID client secret (required if `ENABLE_AZURE_AD_AUTH=true`) | - |
+| `AZURE_AD_TENANT_ID` | Azure AD/Entra ID tenant ID (required if `ENABLE_AZURE_AD_AUTH=true`) | - |
 | `NEXTAUTH_URL` | Base URL for NextAuth (e.g., `http://localhost:3000`) | - |
 | `NEXTAUTH_SECRET` | Secret for NextAuth (can use `VEXA_ADMIN_API_KEY`) | - |
 | `ALLOW_REGISTRATIONS` | Allow new signups | `true` |
@@ -188,6 +192,32 @@ NEXTAUTH_SECRET=your_secret
 
 **Note:** If `ENABLE_GOOGLE_AUTH` is not set, Google OAuth will be automatically enabled if all required configuration variables are present (backward compatible behavior). Set `ENABLE_GOOGLE_AUTH=false` to explicitly disable Google OAuth.
 
+### Microsoft Entra ID (Azure AD OAuth)
+
+With Entra ID configured, users can sign in with their Microsoft account. 
+
+**To enable Entra ID OAuth:**
+
+1. Set the flag: `ENABLE_AZURE_AD_AUTH=true`
+2. Configure Entra ID credentials:
+```bash
+ENABLE_AZURE_AD_AUTH=true
+AZURE_AD_CLIENT_ID=your_entra_client_id
+AZURE_AD_CLIENT_SECRET=your_entra_client_secret
+AZURE_AD_TENANT_ID=your_tenant_id
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your_secret
+```
+
+**Setup Instructions:**
+1. Go to [Microsoft Entra admin center](https://entra.microsoft.com/)
+2. Register a new application (Single tenant or multi-tenant as needed)
+3. Add redirect URI: `http://localhost:3000/api/auth/callback/azure-ad` (or your production URL)
+4. Create a client secret and copy the value
+5. Set `ENABLE_AZURE_AD_AUTH=true` to enable Entra authentication
+
+**Note:** If `ENABLE_AZURE_AD_AUTH` is not set, Entra ID OAuth will be automatically enabled if all required configuration variables are present. Set `ENABLE_AZURE_AD_AUTH=false` to explicitly disable Entra ID OAuth.
+
 ### Magic Link (with SMTP)
 
 With SMTP configured, users receive a secure sign-in link via email. Recommended if not using Google OAuth.
@@ -196,7 +226,7 @@ With SMTP configured, users receive a secure sign-in link via email. Recommended
 
 Without SMTP or Google OAuth configured, users authenticate with just their email (no verification). Great for development and trusted environments.
 
-**Note:** When Google OAuth is enabled (via `ENABLE_GOOGLE_AUTH=true` or auto-detected from config), it takes precedence. Email authentication (magic link or direct) will be available as a secondary option. Set `ENABLE_GOOGLE_AUTH=false` to disable Google OAuth and use email authentication only.
+**Note:** When Google OAuth or Entra ID OAuth is enabled (via `ENABLE_GOOGLE_AUTH=true`, `ENABLE_AZURE_AD_AUTH=true`, or auto-detected from config), it takes precedence. Email authentication (magic link or direct) will be available as a secondary option. Set the appropriate flag to `false` to disable OAuth and use email authentication only.
 
 ## 💻 Local Development
 

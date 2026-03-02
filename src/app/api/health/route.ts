@@ -5,10 +5,11 @@ export const dynamic = "force-dynamic";
 
 interface HealthStatus {
   status: "ok" | "degraded" | "error";
-  authMode: "direct" | "magic-link" | "google";
+  authMode: "direct" | "magic-link" | "google" | "entra-id";
   checks: {
     smtp: { configured: boolean; optional: boolean; error?: string };
     googleOAuth: { configured: boolean; optional: boolean; error?: string };
+    azureAdOAuth: { configured: boolean; optional: boolean; error?: string };
     adminApi: { configured: boolean; reachable: boolean; error?: string };
     vexaApi: { configured: boolean; reachable: boolean; error?: string };
   };
@@ -25,24 +26,46 @@ export async function GET() {
     checks: {
       smtp: { configured: false, optional: true },
       googleOAuth: { configured: false, optional: true },
+      azureAdOAuth: { configured: false, optional: true },
       adminApi: { configured: false, reachable: false },
       vexaApi: { configured: false, reachable: false },
     },
     missingConfig: [],
   };
 
+  // Check Azure AD / Entra ID OAuth configuration (optional)
+  const enableAzureAdAuth = process.env.ENABLE_AZURE_AD_AUTH;
+  const azureAdClientId = process.env.AZURE_AD_CLIENT_ID;
+  const azureAdClientSecret = process.env.AZURE_AD_CLIENT_SECRET;
+  const azureAdTenantId = process.env.AZURE_AD_TENANT_ID;
+  const nextAuthUrl = process.env.NEXTAUTH_URL;
+
+  if (enableAzureAdAuth === "false" || enableAzureAdAuth === "0") {
+    status.checks.azureAdOAuth.error = "Azure AD OAuth is disabled";
+  } else if (azureAdClientId && azureAdClientSecret && azureAdTenantId && nextAuthUrl) {
+    status.checks.azureAdOAuth.configured = true;
+    status.authMode = "entra-id";
+  } else {
+    if (enableAzureAdAuth === "true" || enableAzureAdAuth === "1") {
+      status.checks.azureAdOAuth.error = "Azure AD OAuth is enabled but configuration is incomplete";
+    } else {
+      status.checks.azureAdOAuth.error = "Azure AD OAuth not configured";
+    }
+  }
+
   // Check Google OAuth configuration (optional - enables Google auth)
   const enableGoogleAuth = process.env.ENABLE_GOOGLE_AUTH;
   const googleClientId = process.env.GOOGLE_CLIENT_ID;
   const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const nextAuthUrl = process.env.NEXTAUTH_URL;
 
   // Check if explicitly disabled
   if (enableGoogleAuth === "false" || enableGoogleAuth === "0") {
     status.checks.googleOAuth.error = "Google OAuth is disabled";
   } else if (googleClientId && googleClientSecret && nextAuthUrl) {
     status.checks.googleOAuth.configured = true;
-    status.authMode = "google";
+    if (!status.checks.azureAdOAuth.configured) {
+      status.authMode = "google";
+    }
   } else {
     // Google OAuth is optional
     if (enableGoogleAuth === "true" || enableGoogleAuth === "1") {
