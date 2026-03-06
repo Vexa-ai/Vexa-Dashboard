@@ -21,6 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { useRuntimeConfig } from "@/hooks/use-runtime-config";
 import { EntityChip, type EntityData, type EntityType } from "./entity-chip";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -49,9 +50,6 @@ interface SummaryData {
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
-
-const DECISION_LISTENER_URL =
-  process.env.NEXT_PUBLIC_DECISION_LISTENER_URL ?? "http://localhost:8765";
 
 const SUMMARY_REFRESH_INTERVAL = 10_000;
 
@@ -385,6 +383,8 @@ export function MeetingAnthology({
   segments,
   participants,
 }: MeetingAnthologyProps) {
+  const { config } = useRuntimeConfig();
+  const decisionListenerUrl = config?.decisionListenerUrl ?? "http://localhost:8765";
   const [items, setItems] = useState<AnthologyItem[]>([]);
   const [connected, setConnected] = useState(false);
   const [summary, setSummary] = useState<SummaryData | null>(null);
@@ -404,7 +404,7 @@ export function MeetingAnthology({
     const load = async () => {
       try {
         const res = await fetch(
-          `${DECISION_LISTENER_URL}/decisions/${meetingId}/all`
+          `${decisionListenerUrl}/decisions/${meetingId}/all`
         );
         if (!res.ok) return;
         const data = await res.json();
@@ -431,13 +431,13 @@ export function MeetingAnthology({
       }
     };
     load();
-  }, [meetingId]);
+  }, [decisionListenerUrl, meetingId]);
 
   // ── SSE connection ─────────────────────────────────────────────────────
 
   const connectSSE = useCallback(() => {
     if (esRef.current) return;
-    const url = `${DECISION_LISTENER_URL}/decisions/${meetingId}`;
+    const url = `${decisionListenerUrl}/decisions/${meetingId}`;
     const es = new EventSource(url);
     esRef.current = es;
 
@@ -492,7 +492,7 @@ export function MeetingAnthology({
         if (isActive) connectSSE();
       }, 2000);
     };
-  }, [meetingId, isActive]);
+  }, [decisionListenerUrl, meetingId, isActive]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -510,7 +510,7 @@ export function MeetingAnthology({
     setIsSummaryLoading(true);
     try {
       const res = await fetch(
-        `${DECISION_LISTENER_URL}/summary/${meetingId}`
+        `${decisionListenerUrl}/summary/${meetingId}`
       );
       if (!res.ok) return;
       const data = await res.json();
@@ -523,7 +523,7 @@ export function MeetingAnthology({
     } finally {
       setIsSummaryLoading(false);
     }
-  }, [meetingId, items.length]);
+  }, [decisionListenerUrl, meetingId, items.length]);
 
   useEffect(() => {
     if (items.length === 0) return;

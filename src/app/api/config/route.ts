@@ -8,6 +8,8 @@ import { cookies } from "next/headers";
  */
 export async function GET() {
   const apiUrl = process.env.VEXA_API_URL || "http://localhost:18056";
+  const decisionListenerUrl =
+    process.env.NEXT_PUBLIC_DECISION_LISTENER_URL || "http://localhost:8765";
 
   // Derive WebSocket URL from API URL (can be overridden with NEXT_PUBLIC_VEXA_WS_URL)
   let wsUrl = process.env.NEXT_PUBLIC_VEXA_WS_URL;
@@ -29,6 +31,7 @@ export async function GET() {
   return NextResponse.json({
     wsUrl,
     apiUrl,
+    decisionListenerUrl,
     authToken: authToken || null,
     defaultBotName,
   });

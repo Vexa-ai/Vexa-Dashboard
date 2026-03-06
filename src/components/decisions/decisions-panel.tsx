@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { useRuntimeConfig } from "@/hooks/use-runtime-config";
 import { cn } from "@/lib/utils";
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -50,9 +51,6 @@ export interface DecisionItem {
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────
-
-const DECISION_LISTENER_URL =
-  process.env.NEXT_PUBLIC_DECISION_LISTENER_URL ?? "http://localhost:8765";
 
 function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -378,6 +376,8 @@ interface DecisionsPanelProps {
 }
 
 export function DecisionsPanel({ meetingId, isActive, embedded }: DecisionsPanelProps) {
+  const { config } = useRuntimeConfig();
+  const decisionListenerUrl = config?.decisionListenerUrl ?? "http://localhost:8765";
   const [items, setItems] = useState<DecisionItem[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [connected, setConnected] = useState(false);
@@ -390,7 +390,7 @@ export function DecisionsPanel({ meetingId, isActive, embedded }: DecisionsPanel
 
   const connectSSE = useCallback(() => {
     if (esRef.current) return; // already connected
-    const url = `${DECISION_LISTENER_URL}/decisions/${meetingId}`;
+    const url = `${decisionListenerUrl}/decisions/${meetingId}`;
     const es = new EventSource(url);
     esRef.current = es;
 
@@ -444,7 +444,7 @@ export function DecisionsPanel({ meetingId, isActive, embedded }: DecisionsPanel
         if (isActive) connectSSE();
       }, 5000);
     };
-  }, [meetingId, isActive]);
+  }, [decisionListenerUrl, meetingId, isActive]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -461,7 +461,7 @@ export function DecisionsPanel({ meetingId, isActive, embedded }: DecisionsPanel
     const load = async () => {
       try {
         const res = await fetch(
-          `${DECISION_LISTENER_URL}/decisions/${meetingId}/all`
+          `${decisionListenerUrl}/decisions/${meetingId}/all`
         );
         if (!res.ok) return;
         const data = await res.json();
@@ -488,7 +488,7 @@ export function DecisionsPanel({ meetingId, isActive, embedded }: DecisionsPanel
       }
     };
     load();
-  }, [meetingId]);
+  }, [decisionListenerUrl, meetingId]);
 
   // ── Item actions ─────────────────────────────────────────────────────────
 

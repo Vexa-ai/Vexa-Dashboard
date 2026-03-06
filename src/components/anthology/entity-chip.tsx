@@ -14,6 +14,7 @@ import {
   FloatingPortal,
 } from "@floating-ui/react";
 import { User, Building2, Package, Calendar, DollarSign, FileText, Hash, Loader2, ExternalLink } from "lucide-react";
+import { useRuntimeConfig } from "@/hooks/use-runtime-config";
 import { cn } from "@/lib/utils";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -56,11 +57,6 @@ const TYPE_COLORS: Record<EntityType, string> = {
   topic: "bg-gray-50 text-gray-700 hover:bg-gray-100 dark:bg-gray-800/40 dark:text-gray-300 dark:hover:bg-gray-800/60",
 };
 
-// ── Decision listener URL ──────────────────────────────────────────────────
-
-const DECISION_LISTENER_URL =
-  process.env.NEXT_PUBLIC_DECISION_LISTENER_URL ?? "http://localhost:8765";
-
 // ── Entity Chip Component ──────────────────────────────────────────────────
 
 interface EntityChipProps {
@@ -69,6 +65,8 @@ interface EntityChipProps {
 }
 
 export function EntityChip({ entity, onEnrich }: EntityChipProps) {
+  const { config } = useRuntimeConfig();
+  const decisionListenerUrl = config?.decisionListenerUrl ?? "http://localhost:8765";
   const [isHoverOpen, setIsHoverOpen] = useState(false);
   const [enrichment, setEnrichment] = useState<EnrichmentData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -102,7 +100,7 @@ export function EntityChip({ entity, onEnrich }: EntityChipProps) {
         label: entity.label,
         context: entity.context || "",
       });
-      const url = `${DECISION_LISTENER_URL}/enrich/${entity.type}/${entity.id}?${params}`;
+      const url = `${decisionListenerUrl}/enrich/${entity.type}/${entity.id}?${params}`;
       const es = new EventSource(url);
 
       es.addEventListener("enrichment", (ev) => {
@@ -145,7 +143,7 @@ export function EntityChip({ entity, onEnrich }: EntityChipProps) {
       setIsLoading(false);
       enrichingRef.current = false;
     }
-  }, [entity, isEnriched]);
+  }, [decisionListenerUrl, entity, isEnriched]);
 
   return (
     <>
