@@ -45,7 +45,7 @@ import { useLiveTranscripts } from "@/hooks/use-live-transcripts";
 import { PLATFORM_CONFIG, getDetailedStatus } from "@/types/vexa";
 import type { MeetingStatus, Meeting } from "@/types/vexa";
 import { StatusHistory } from "@/components/meetings/status-history";
-import { cn } from "@/lib/utils";
+import { cn, parseUTCTimestamp } from "@/lib/utils";
 import { vexaAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { LanguagePicker } from "@/components/language-picker";
@@ -208,9 +208,9 @@ export default function MeetingDetailPage() {
     // whose createdAt is closest but not after the segment's absolute_start_time.
     let targetFragmentIndex = 0;
     if (absoluteStartTime) {
-      const segTime = new Date(absoluteStartTime).getTime();
+      const segTime = parseUTCTimestamp(absoluteStartTime).getTime();
       for (let i = recordingFragments.length - 1; i >= 0; i--) {
-        const fragTime = new Date(recordingFragments[i].createdAt).getTime();
+        const fragTime = parseUTCTimestamp(recordingFragments[i].createdAt).getTime();
         if (fragTime <= segTime) {
           targetFragmentIndex = i;
           break;
@@ -372,21 +372,21 @@ export default function MeetingDetailPage() {
     }
     
     if (meeting.start_time) {
-      output += `Date: ${format(new Date(meeting.start_time), "PPPp")}\n`;
+      output += `Date: ${format(parseUTCTimestamp(meeting.start_time), "PPPp")}\n`;
     }
-    
+
     if (meeting.data?.participants?.length) {
       output += `Participants: ${meeting.data.participants.join(", ")}\n`;
     }
-    
+
     output += "\n---\n\n";
-    
+
     for (const segment of segments) {
       // Use absolute timestamp if available
       let timestamp = "";
       if (segment.absolute_start_time) {
         try {
-          const date = new Date(segment.absolute_start_time);
+          const date = parseUTCTimestamp(segment.absolute_start_time);
           timestamp = date.toISOString().replace("T", " ").replace(/\.\d{3}Z$/, "").replace("Z", "");
         } catch {
           timestamp = segment.absolute_start_time;
@@ -628,7 +628,7 @@ export default function MeetingDetailPage() {
     if (playbackTime == null || !isPlaybackActive || recordingFragments.length === 0) return null;
     if (recordingFragments.length === 1) {
       // Single fragment: absolute time = fragment createdAt + playback time
-      const fragStart = new Date(recordingFragments[0].createdAt).getTime();
+      const fragStart = parseUTCTimestamp(recordingFragments[0].createdAt).getTime();
       return new Date(fragStart + playbackTime * 1000).toISOString();
     }
     // Multi-fragment: find which fragment the virtual time falls in
@@ -636,7 +636,7 @@ export default function MeetingDetailPage() {
     for (let i = 0; i < recordingFragments.length; i++) {
       const fragDur = recordingFragments[i].duration || 0;
       if (remaining <= fragDur || i === recordingFragments.length - 1) {
-        const fragStart = new Date(recordingFragments[i].createdAt).getTime();
+        const fragStart = parseUTCTimestamp(recordingFragments[i].createdAt).getTime();
         return new Date(fragStart + remaining * 1000).toISOString();
       }
       remaining -= fragDur;
@@ -675,8 +675,8 @@ export default function MeetingDetailPage() {
   const duration =
     currentMeeting.start_time && currentMeeting.end_time
       ? Math.round(
-          (new Date(currentMeeting.end_time).getTime() -
-            new Date(currentMeeting.start_time).getTime()) /
+          (parseUTCTimestamp(currentMeeting.end_time).getTime() -
+            parseUTCTimestamp(currentMeeting.start_time).getTime()) /
             60000
         )
       : null;
@@ -1370,7 +1370,7 @@ export default function MeetingDetailPage() {
                   <div>
                     <p className="text-sm font-medium">Date</p>
                     <p className="text-sm text-muted-foreground">
-                      {format(new Date(currentMeeting.start_time), "PPPp")}
+                      <span suppressHydrationWarning>{format(parseUTCTimestamp(currentMeeting.start_time), "PPPp")}</span>
                     </p>
                   </div>
                 </div>

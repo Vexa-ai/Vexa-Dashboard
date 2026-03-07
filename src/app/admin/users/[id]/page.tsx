@@ -50,7 +50,7 @@ import {
 import { ErrorState } from "@/components/ui/error-state";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAdminStore } from "@/stores/admin-store";
-import { cn } from "@/lib/utils";
+import { cn, parseUTCTimestamp } from "@/lib/utils";
 import { toast } from "sonner";
 
 export default function UserDetailPage() {
@@ -331,7 +331,7 @@ export default function UserDetailPage() {
                 <div>
                   <p className="text-sm font-medium">Created</p>
                   <p className="text-sm text-muted-foreground">
-                    {format(new Date(selectedUser.created_at), "PPP")}
+                    <span suppressHydrationWarning>{format(parseUTCTimestamp(selectedUser.created_at), "PPP")}</span>
                   </p>
                 </div>
               </div>
@@ -464,7 +464,7 @@ export default function UserDetailPage() {
                           {token.token.slice(0, 8)}...{token.token.slice(-8)}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Created {formatDistanceToNow(new Date(token.created_at), { addSuffix: true })}
+                          <span suppressHydrationWarning>Created {formatDistanceToNow(parseUTCTimestamp(token.created_at), { addSuffix: true })}</span>
                         </p>
                       </div>
                       <div className="flex items-center gap-2">

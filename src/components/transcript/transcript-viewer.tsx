@@ -29,7 +29,7 @@ import {
   downloadFile,
   generateFilename,
 } from "@/lib/export";
-import { cn } from "@/lib/utils";
+import { cn, parseUTCTimestamp } from "@/lib/utils";
 import { format } from "date-fns";
 
 // Linkify URLs in chat message text — splits text into plain strings and clickable <a> elements
@@ -371,10 +371,10 @@ export function TranscriptViewer({
     // Sort by timestamp: transcript groups use ISO startTime, chat messages use Unix ms
     items.sort((a, b) => {
       const timeA = a.type === "transcript"
-        ? new Date(a.group.startTime).getTime()
+        ? parseUTCTimestamp(a.group.startTime).getTime()
         : a.message.timestamp;
       const timeB = b.type === "transcript"
-        ? new Date(b.group.startTime).getTime()
+        ? parseUTCTimestamp(b.group.startTime).getTime()
         : b.message.timestamp;
       return timeA - timeB;
     });
@@ -537,14 +537,14 @@ export function TranscriptViewer({
       const pbTime = new Date(playbackAbsoluteTime).getTime();
       for (let i = filteredSegments.length - 1; i >= 0; i--) {
         const group = filteredSegments[i];
-        const groupStart = new Date(group.startTime).getTime();
-        const groupEnd = new Date(group.endTime).getTime();
+        const groupStart = parseUTCTimestamp(group.startTime).getTime();
+        const groupEnd = parseUTCTimestamp(group.endTime).getTime();
         if (groupStart <= pbTime) {
           // Within this group's range (with 1s tolerance)
           if (pbTime <= groupEnd + 1000) return i;
           // Between this group and the next
           if (i < filteredSegments.length - 1) {
-            const nextStart = new Date(filteredSegments[i + 1].startTime).getTime();
+            const nextStart = parseUTCTimestamp(filteredSegments[i + 1].startTime).getTime();
             if (pbTime < nextStart) return i;
           }
           // Past the last group
@@ -628,7 +628,7 @@ export function TranscriptViewer({
     }
     
     if (meeting.start_time) {
-      output += `Date: ${format(new Date(meeting.start_time), "PPPp")}\n`;
+      output += `Date: ${format(parseUTCTimestamp(meeting.start_time), "PPPp")}\n`;
     }
     
     if (meeting.data?.participants?.length) {
@@ -642,7 +642,7 @@ export function TranscriptViewer({
       let timestamp = "";
       if (segment.absolute_start_time) {
         try {
-          const date = new Date(segment.absolute_start_time);
+          const date = parseUTCTimestamp(segment.absolute_start_time);
           timestamp = date.toISOString().replace("T", " ").replace(/\.\d{3}Z$/, "").replace("Z", "");
         } catch {
           timestamp = segment.absolute_start_time;
