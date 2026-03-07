@@ -39,7 +39,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { vexaAPI } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, parseUTCTimestamp } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Meeting, MeetingStatus, Platform } from "@/types/vexa";
 
@@ -336,7 +336,7 @@ export default function AdminBotsPage() {
                     const isStopping = stoppingBots.has(`${meeting.platform}:${meeting.platform_specific_id}`);
 
                     const duration = meeting.start_time && meeting.end_time
-                      ? Math.round((new Date(meeting.end_time).getTime() - new Date(meeting.start_time).getTime()) / 60000)
+                      ? Math.round((parseUTCTimestamp(meeting.end_time).getTime() - parseUTCTimestamp(meeting.start_time).getTime()) / 60000)
                       : null;
 
                     return (
@@ -356,7 +356,7 @@ export default function AdminBotsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {formatDistanceToNow(new Date(meeting.created_at), { addSuffix: true })}
+                          <span suppressHydrationWarning>{formatDistanceToNow(parseUTCTimestamp(meeting.created_at), { addSuffix: true })}</span>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {duration ? `${duration} min` : "-"}
