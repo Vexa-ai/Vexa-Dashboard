@@ -9,6 +9,7 @@ import { MeetingList } from "@/components/meetings/meeting-list";
 import { ErrorState } from "@/components/ui/error-state";
 import { MCPConfigButton } from "@/components/mcp/mcp-config-button";
 import { useMeetingsStore } from "@/stores/meetings-store";
+import { parseUTCTimestamp } from "@/lib/utils";
 import { useJoinModalStore } from "@/stores/join-modal-store";
 
 export default function DashboardPage() {
@@ -27,7 +28,7 @@ export default function DashboardPage() {
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   const thisWeekMeetings = meetings.filter(
-    (m) => new Date(m.created_at) >= oneWeekAgo
+    (m) => parseUTCTimestamp(m.created_at) >= oneWeekAgo
   ).length;
 
   // Get recent meetings (last 5)

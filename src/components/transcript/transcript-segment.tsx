@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn, parseUTCTimestamp } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Play } from "lucide-react";
 import type { TranscriptSegment as TranscriptSegmentType, SpeakerColor } from "@/types/vexa";
@@ -23,20 +23,12 @@ function formatTimestamp(seconds: number): string {
 
 function formatAbsoluteTimestamp(utcAbsoluteTime: string): string {
   try {
-    // Extract time directly from ISO 8601 string (e.g., "2025-11-27T15:12:22.341578+00:00" -> "15:12:22")
-    // This avoids any device-dependent timezone conversion
-    // Format: YYYY-MM-DDTHH:MM:SS... or YYYY-MM-DDTHH:MM:SSZ
-    const timeMatch = utcAbsoluteTime.match(/T(\d{2}):(\d{2})(?::(\d{2}))?/);
-    if (timeMatch) {
-      const hh = timeMatch[1];
-      const mm = timeMatch[2];
-      const ss = timeMatch[3] ?? "00";
-      return `${hh}:${mm}:${ss}`;
-    }
-    // Fallback if format doesn't match expected pattern
-    return "00:00:00";
+    const date = parseUTCTimestamp(utcAbsoluteTime);
+    const hh = date.getHours().toString().padStart(2, "0");
+    const mm = date.getMinutes().toString().padStart(2, "0");
+    const ss = date.getSeconds().toString().padStart(2, "0");
+    return `${hh}:${mm}:${ss}`;
   } catch (error) {
-    // Fallback to relative timestamp if absolute time is invalid
     console.error("Error parsing absolute timestamp:", error);
     return "00:00:00";
   }
@@ -137,7 +129,7 @@ export function TranscriptSegment({
           <span className={cn("font-medium text-sm", speakerColor.text)}>
             {segment.speaker || "Unknown Speaker"}
           </span>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground" suppressHydrationWarning>
             {displayTimestamp}
           </span>
           {onClickSegment && (

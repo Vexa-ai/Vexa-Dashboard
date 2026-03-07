@@ -78,7 +78,7 @@ export function MeetingCard({ meeting }: MeetingCardProps) {
 
   const duration = meeting.start_time && meeting.end_time
     ? Math.round(
-        (new Date(meeting.end_time).getTime() - new Date(meeting.start_time).getTime()) / 60000
+        (parseUTCTimestamp(meeting.end_time).getTime() - parseUTCTimestamp(meeting.start_time).getTime()) / 60000
       )
     : null;
 
@@ -364,14 +364,14 @@ export function MeetingCard({ meeting }: MeetingCardProps) {
                 {meeting.start_time && (
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Calendar className="h-3.5 w-3.5" />
-                    <span>{format(new Date(meeting.start_time), "MMM d, yyyy")}</span>
+                    <span suppressHydrationWarning>{format(parseUTCTimestamp(meeting.start_time), "MMM d, yyyy")}</span>
                   </div>
                 )}
 
                 {meeting.start_time && (
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Clock className="h-3.5 w-3.5" />
-                    <span>{formatDistanceToNow(new Date(meeting.start_time), { addSuffix: true })}</span>
+                    <span suppressHydrationWarning>{formatDistanceToNow(parseUTCTimestamp(meeting.start_time), { addSuffix: true })}</span>
                   </div>
                 )}
 
