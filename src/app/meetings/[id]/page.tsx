@@ -7,6 +7,7 @@ import Image from "next/image";
 import { format } from "date-fns";
 import {
   ArrowLeft,
+  Bot,
   Calendar,
   Clock,
   Users,
@@ -42,6 +43,7 @@ import { BotStatusIndicator, BotFailedIndicator } from "@/components/meetings/bo
 import { WsEventLog, RestTranscriptsPreview, RestRecordingsPreview } from "@/components/meetings/ws-event-log";
 // ChatPanel removed — chat messages now render inline in TranscriptViewer
 import { AIChatPanel } from "@/components/ai";
+import { AgentChat } from "@/components/agent/agent-chat";
 import { useMeetingsStore } from "@/stores/meetings-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLiveTranscripts } from "@/hooks/use-live-transcripts";
@@ -255,9 +257,10 @@ export default function MeetingDetailPage() {
 
   // Handle meeting status change from WebSocket
   const handleStatusChange = useCallback((status: MeetingStatus) => {
-    // Refetch when status changes so we get latest data and post-meeting artifacts.
+    // Silently refresh meeting data — never show loading skeleton mid-session
+    // (loading skeleton unmounts AgentChat and kills the active agent stream)
     if (status === "active" || status === "stopping" || status === "completed" || status === "failed") {
-      fetchMeeting(meetingId);
+      refreshMeeting(meetingId);
     }
     if (
       (status === "stopping" || status === "completed") &&
@@ -266,7 +269,7 @@ export default function MeetingDetailPage() {
     ) {
       fetchTranscripts(currentMeeting.platform, currentMeeting.platform_specific_id);
     }
-  }, [fetchMeeting, fetchTranscripts, meetingId, currentMeeting?.platform, currentMeeting?.platform_specific_id]);
+  }, [refreshMeeting, fetchTranscripts, meetingId, currentMeeting?.platform, currentMeeting?.platform_specific_id]);
 
   // Handle stopping the bot
   const handleStopBot = useCallback(async () => {
@@ -281,7 +284,7 @@ export default function MeetingDetailPage() {
       toast.success("Bot stopped", {
         description: "The transcription has been stopped.",
       });
-      fetchMeeting(meetingId);
+      refreshMeeting(meetingId);
     } catch (error) {
       toast.error("Failed to stop bot", {
         description: (error as Error).message,
@@ -289,7 +292,7 @@ export default function MeetingDetailPage() {
     } finally {
       setIsStoppingBot(false);
     }
-  }, [currentMeeting, fetchMeeting, fetchTranscripts, meetingId, updateMeetingStatus]);
+  }, [currentMeeting, refreshMeeting, fetchTranscripts, meetingId, updateMeetingStatus]);
 
   // Handle language change
   const handleLanguageChange = useCallback(async (newLanguage: string) => {
@@ -303,7 +306,7 @@ export default function MeetingDetailPage() {
       setCurrentLanguage(newLanguage);
       updateMeetingData(currentMeeting.platform, currentMeeting.platform_specific_id, {
         languages: [newLanguage],
-      });
+      }, currentMeeting.id);
       toast.success("Language updated successfully");
     } catch (error) {
       toast.error("Failed to update language", {
@@ -506,8 +509,14 @@ export default function MeetingDetailPage() {
     currentMeeting?.status === "joining" ||
     currentMeeting?.status === "awaiting_admission";
   const isStoppingState = currentMeeting?.status === "stopping";
+  // Agent-only: platform is "agent" (no real meeting, just chat)
+  // Meeting+agent: real meeting platform (google_meet, zoom, teams) with agent_enabled
+  const isAgentOnly = currentMeeting?.platform === "agent";
+  const isMeetingWithAgent = !isAgentOnly && !!currentMeeting?.data?.agent_enabled;
+  const isAgentMeeting = isAgentOnly || isMeetingWithAgent;
+  // WebSocket for live transcripts — enabled for real meetings (including meeting+agent)
   const shouldUseWebSocket =
-    currentMeeting?.status === "active" || isEarlyState || isStoppingState;
+    !isAgentOnly && (currentMeeting?.status === "active" || isEarlyState || isStoppingState);
   
   const {
     isConnecting: wsConnecting,
@@ -570,6 +579,9 @@ export default function MeetingDetailPage() {
   const meetingStatus = currentMeeting?.status;
 
   useEffect(() => {
+    // Agent-only meetings don't have transcripts or chat messages
+    if (isAgentOnly) return;
+
     // Always refresh transcript/recording artifacts when entering post-meeting flow.
     if ((meetingStatus === "stopping" || meetingStatus === "completed") && meetingPlatform && meetingNativeId) {
       fetchTranscripts(meetingPlatform, meetingNativeId);
@@ -582,14 +594,15 @@ export default function MeetingDetailPage() {
       fetchTranscripts(meetingPlatform, meetingNativeId);
       fetchChatMessages(meetingPlatform, meetingNativeId);
     }
-  }, [meetingStatus, shouldUseWebSocket, meetingPlatform, meetingNativeId, fetchTranscripts, fetchChatMessages]);
+  }, [meetingStatus, shouldUseWebSocket, meetingPlatform, meetingNativeId, fetchTranscripts, fetchChatMessages, isAgentOnly]);
 
   // Also fetch chat messages for active meetings (WS handles real-time, REST bootstraps)
   useEffect(() => {
+    if (isAgentOnly) return;
     if (shouldUseWebSocket && meetingPlatform && meetingNativeId) {
       fetchChatMessages(meetingPlatform, meetingNativeId);
     }
-  }, [shouldUseWebSocket, meetingPlatform, meetingNativeId, fetchChatMessages]);
+  }, [shouldUseWebSocket, meetingPlatform, meetingNativeId, fetchChatMessages, isAgentOnly]);
 
   // Handle saving notes on blur
   const handleNotesBlur = useCallback(async () => {
@@ -608,7 +621,7 @@ export default function MeetingDetailPage() {
     try {
       await updateMeetingData(currentMeeting.platform, currentMeeting.platform_specific_id, {
         notes: trimmedNotes,
-      });
+      }, currentMeeting.id);
       setIsEditingNotes(false);
     } catch (err) {
       toast.error("Failed to save notes");
@@ -673,8 +686,11 @@ export default function MeetingDetailPage() {
     return <MeetingDetailSkeleton />;
   }
 
-  const platformConfig = PLATFORM_CONFIG[currentMeeting.platform];
+  const platformConfig = PLATFORM_CONFIG[currentMeeting.platform] || PLATFORM_CONFIG.agent;
   const statusConfig = getDetailedStatus(currentMeeting.status, currentMeeting.data);
+  const isAgent = currentMeeting.platform === "agent" || !!currentMeeting.data?.agent_enabled;
+  const isAgentOnlyView = currentMeeting.platform === "agent";
+  const isMeetingWithAgentView = !isAgentOnlyView && !!currentMeeting.data?.agent_enabled;
 
   // Safety check: ensure statusConfig is always defined
   if (!statusConfig) {
@@ -754,7 +770,7 @@ export default function MeetingDetailPage() {
                     try {
                       await updateMeetingData(currentMeeting.platform, currentMeeting.platform_specific_id, {
                         name: editedTitle.trim(),
-                      });
+                      }, currentMeeting.id);
                       setIsEditingTitle(false);
                       toast.success("Title updated");
                     } catch (err) {
@@ -779,7 +795,7 @@ export default function MeetingDetailPage() {
                     try {
                       await updateMeetingData(currentMeeting.platform, currentMeeting.platform_specific_id, {
                         name: editedTitle.trim(),
-                      });
+                      }, currentMeeting.id);
                       setIsEditingTitle(false);
                       toast.success("Title updated");
                     } catch (err) {
@@ -1087,7 +1103,7 @@ export default function MeetingDetailPage() {
                         try {
                           await updateMeetingData(currentMeeting.platform, currentMeeting.platform_specific_id, {
                             name: editedTitle.trim(),
-                          });
+                          }, currentMeeting.id);
                           setIsEditingTitle(false);
                           toast.success("Title updated");
                         } catch (err) {
@@ -1111,7 +1127,7 @@ export default function MeetingDetailPage() {
                       try {
                         await updateMeetingData(currentMeeting.platform, currentMeeting.platform_specific_id, {
                           name: editedTitle.trim(),
-                        });
+                        }, currentMeeting.id);
                         setIsEditingTitle(false);
                         toast.success("Title updated");
                       } catch (err) {
@@ -1361,8 +1377,65 @@ export default function MeetingDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
         {/* Transcript or Status Indicator */}
         <div className="lg:col-span-2 order-2 lg:order-1 flex flex-col min-h-0 flex-1">
-          {/* Show bot status for early states */}
-          {(currentMeeting.status === "requested" ||
+          {/* Agent-only: full-width agent chat — container stays alive beyond meeting */}
+          {isAgentOnlyView && currentMeeting.status !== "failed" && (
+            <Card className="flex-1 flex flex-col min-h-[500px] overflow-hidden">
+              <AgentChat meetingId={meetingId} className="flex-1" />
+            </Card>
+          )}
+
+          {/* Meeting+Agent: agent chat available immediately, transcript joins when active */}
+          {isMeetingWithAgentView && currentMeeting.status !== "failed" && (
+            <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
+              {/* Left panel: bot status during early states, transcript when active+ */}
+              <div className="flex-1 min-w-0 min-h-0">
+                {(currentMeeting.status === "requested" ||
+                  currentMeeting.status === "joining" ||
+                  currentMeeting.status === "awaiting_admission") && (
+                  <BotStatusIndicator
+                    status={currentMeeting.status}
+                    platform={currentMeeting.platform}
+                    meetingId={currentMeeting.platform_specific_id}
+                    createdAt={currentMeeting.created_at}
+                    updatedAt={currentMeeting.updated_at}
+                    onStopped={() => {
+                      refreshMeeting(meetingId);
+                    }}
+                  />
+                )}
+                {(currentMeeting.status === "active" ||
+                  currentMeeting.status === "stopping" ||
+                  currentMeeting.status === "completed") && (
+                  <TranscriptViewer
+                    meeting={currentMeeting}
+                    segments={transcripts}
+                    chatMessages={chatMessages}
+                    isLoading={isLoadingTranscripts}
+                    isLive={currentMeeting.status === "active"}
+                    wsConnecting={wsConnecting}
+                    wsConnected={wsConnected}
+                    wsError={wsError}
+                    wsReconnectAttempts={reconnectAttempts}
+                    headerActions={<DocsLink href="/docs/cookbook/get-transcripts" />}
+                    topBarContent={recordingTopBar}
+                    playbackTime={playbackTime}
+                    playbackAbsoluteTime={playbackAbsoluteTime}
+                    isPlaybackActive={isPlaybackActive}
+                    onSegmentClick={canUseSegmentPlayback ? handleSegmentClick : undefined}
+                  />
+                )}
+              </div>
+              {/* Right panel: agent chat — available throughout, container stays alive beyond meeting */}
+              <div className="flex-1 min-w-0 min-h-[500px]">
+                <Card className="h-full flex flex-col overflow-hidden">
+                  <AgentChat meetingId={meetingId} className="flex-1" />
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {/* Regular meeting (no agent): bot status for early states */}
+          {!isAgent && (currentMeeting.status === "requested" ||
             currentMeeting.status === "joining" ||
             currentMeeting.status === "awaiting_admission") && (
             <BotStatusIndicator
@@ -1372,7 +1445,7 @@ export default function MeetingDetailPage() {
               createdAt={currentMeeting.created_at}
               updatedAt={currentMeeting.updated_at}
               onStopped={() => {
-                fetchMeeting(meetingId);
+                refreshMeeting(meetingId);
               }}
             />
           )}
@@ -1386,8 +1459,8 @@ export default function MeetingDetailPage() {
             />
           )}
 
-          {/* Keep transcript visible through stopping -> completed transition */}
-          {(currentMeeting.status === "active" ||
+          {/* Regular meeting (no agent): transcript only */}
+          {!isAgent && (currentMeeting.status === "active" ||
             currentMeeting.status === "stopping" ||
             currentMeeting.status === "completed") && (
             <TranscriptViewer
@@ -1442,14 +1515,19 @@ export default function MeetingDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Video className="h-4 w-4" />
-                Meeting Info
+                {isAgent ? <Bot className="h-4 w-4 text-purple-500" /> : <Video className="h-4 w-4" />}
+                {isAgent ? "Agent Info" : "Meeting Info"}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Platform & Meeting ID */}
               <div className="flex items-center gap-3">
                 <div className="h-8 w-8 rounded-lg flex items-center justify-center overflow-hidden bg-background">
+                  {isAgent ? (
+                    <div className="h-8 w-8 rounded-lg bg-purple-100 dark:bg-purple-950 flex items-center justify-center">
+                      <Bot className="h-5 w-5 text-purple-500" />
+                    </div>
+                  ) : (
                   <Image
                     src={currentMeeting.platform === "google_meet"
                       ? "/icons/icons8-google-meet-96.png"
@@ -1461,6 +1539,7 @@ export default function MeetingDetailPage() {
                     height={32}
                     className="object-contain"
                   />
+                  )}
                 </div>
                 <div>
                   <p className="text-sm font-medium">{platformConfig.name}</p>

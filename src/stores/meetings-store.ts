@@ -40,7 +40,7 @@ interface MeetingsState {
   fetchMeeting: (id: string, options?: { silent?: boolean }) => Promise<void>;
   refreshMeeting: (id: string) => Promise<void>;
   fetchTranscripts: (platform: Platform, nativeId: string) => Promise<void>;
-  updateMeetingData: (platform: Platform, nativeId: string, data: MeetingDataUpdate) => Promise<void>;
+  updateMeetingData: (platform: Platform, nativeId: string, data: MeetingDataUpdate, meetingId?: string) => Promise<void>;
   deleteMeeting: (platform: Platform, nativeId: string, meetingId?: string) => Promise<void>;
   setCurrentMeeting: (meeting: Meeting | null) => void;
   clearCurrentMeeting: () => void;
@@ -198,10 +198,10 @@ export const useMeetingsStore = create<MeetingsState>((set, get) => ({
   },
 
   // Update meeting data (title, notes, etc.)
-  updateMeetingData: async (platform: Platform, nativeId: string, data: MeetingDataUpdate) => {
+  updateMeetingData: async (platform: Platform, nativeId: string, data: MeetingDataUpdate, meetingId?: string) => {
     set({ isUpdatingMeeting: true });
     try {
-      const updatedMeeting = await vexaAPI.updateMeetingData(platform, nativeId, data);
+      const updatedMeeting = await vexaAPI.updateMeetingData(platform, nativeId, data, meetingId);
 
       // Update current meeting if it matches
       const { currentMeeting, meetings } = get();

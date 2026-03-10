@@ -1,6 +1,6 @@
 // Vexa API Types
 
-export type Platform = "google_meet" | "teams" | "zoom";
+export type Platform = "google_meet" | "teams" | "zoom" | "agent";
 
 export type MeetingStatus =
   | "requested"
@@ -71,12 +71,40 @@ export interface TranscriptSegment {
 }
 
 export interface CreateBotRequest {
-  platform: Platform;
-  native_meeting_id: string;
+  platform?: Platform;
+  native_meeting_id?: string;
   passcode?: string;
+  meeting_url?: string;
   bot_name?: string;
   language?: string;
+  agent_enabled?: boolean;
 }
+
+// Agent Chat SSE Event Types
+export interface AgentTextDelta {
+  type: "text_delta";
+  text: string;
+}
+
+export interface AgentToolUse {
+  type: "tool_use";
+  tool: string;
+  summary: string;
+}
+
+export interface AgentDone {
+  type: "done";
+  session_id?: string;
+  cost_usd?: number;
+  duration_ms?: number;
+}
+
+export interface AgentError {
+  type: "error";
+  message: string;
+}
+
+export type AgentChatEvent = AgentTextDelta | AgentToolUse | AgentDone | AgentError;
 
 export interface BotConfigUpdate {
   language?: string;
@@ -238,6 +266,15 @@ export const PLATFORM_CONFIG = {
     icon: "video",
     pattern: /^\d{9,11}$/,
     placeholder: "85173157171",
+  },
+  agent: {
+    name: "Agent",
+    color: "bg-purple-500",
+    textColor: "text-purple-600",
+    bgColor: "bg-purple-50",
+    icon: "bot",
+    pattern: /^agent-/,
+    placeholder: "",
   },
 } as const;
 

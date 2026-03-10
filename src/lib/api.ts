@@ -273,9 +273,14 @@ export const vexaAPI = {
       notes?: string;
       participants?: string[];
       languages?: string[];
-    }
+    },
+    meetingId?: string
   ): Promise<Meeting> {
-    const response = await fetch(`/api/vexa/meetings/${platform}/${nativeId}`, {
+    // Use DB meeting ID when available (required for agent platform)
+    const url = meetingId
+      ? `/api/vexa/meetings/${meetingId}`
+      : `/api/vexa/meetings/${platform}/${nativeId}`;
+    const response = await fetch(url, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ data }),
@@ -315,6 +320,47 @@ export const vexaAPI = {
   // Recordings - get the proxied URL for streaming audio via /raw endpoint
   getRecordingAudioUrl(recordingId: number, mediaFileId: number): string {
     return `/api/vexa/recordings/${recordingId}/media/${mediaFileId}/raw`;
+  },
+
+  // Agent Chat
+  async createAgent(): Promise<Meeting> {
+    return this.createBot({ agent_enabled: true });
+  },
+
+  async agentChatStream(
+    meetingId: string,
+    message: string,
+    options?: { signal?: AbortSignal }
+  ): Promise<Response> {
+    const response = await fetch(`/api/vexa/bots/${meetingId}/agent/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+      signal: options?.signal,
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new VexaAPIError(errorText, response.status);
+    }
+    return response;
+  },
+
+  async agentInterrupt(meetingId: string): Promise<void> {
+    const response = await fetch(`/api/vexa/bots/${meetingId}/agent/chat`, {
+      method: "DELETE",
+    });
+    if (!response.ok && response.status !== 404) {
+      throw new VexaAPIError("Failed to interrupt agent", response.status);
+    }
+  },
+
+  async agentResetSession(meetingId: string): Promise<void> {
+    const response = await fetch(`/api/vexa/bots/${meetingId}/agent/chat/reset`, {
+      method: "POST",
+    });
+    if (!response.ok) {
+      throw new VexaAPIError("Failed to reset session", response.status);
+    }
   },
 
   // Connection test

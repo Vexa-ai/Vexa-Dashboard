@@ -4,6 +4,7 @@ export interface ParsedMeetingInput {
   platform: Platform;
   meetingId: string;
   passcode?: string;
+  originalUrl?: string; // Preserve original URL for API passthrough
 }
 
 // Parse Google Meet, Zoom, or Teams URL/meeting ID
@@ -16,7 +17,7 @@ export function parseMeetingInput(input: string): ParsedMeetingInput | null {
   const googleMeetUrlRegex = /(?:https?:\/\/)?meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/i;
   const googleMeetMatch = trimmed.match(googleMeetUrlRegex);
   if (googleMeetMatch) {
-    return { platform: "google_meet", meetingId: googleMeetMatch[1].toLowerCase() };
+    return { platform: "google_meet", meetingId: googleMeetMatch[1].toLowerCase(), originalUrl: trimmed };
   }
 
   // Direct Google Meet code (abc-defg-hij)
@@ -41,7 +42,7 @@ export function parseMeetingInput(input: string): ParsedMeetingInput | null {
     const passcodeMatch = trimmed.match(/[?&]p=([^&]+)/i);
     const passcode = passcodeMatch ? decodeURIComponent(passcodeMatch[1]) : undefined;
 
-    return { platform: "teams", meetingId, passcode };
+    return { platform: "teams", meetingId, passcode, originalUrl: trimmed };
   }
 
   // Zoom URL patterns
@@ -52,7 +53,7 @@ export function parseMeetingInput(input: string): ParsedMeetingInput | null {
   if (zoomMatch) {
     const passcodeMatch = trimmed.match(/[?&]pwd=([^&]+)/i);
     const passcode = passcodeMatch ? decodeURIComponent(passcodeMatch[1]) : undefined;
-    return { platform: "zoom", meetingId: zoomMatch[1], passcode };
+    return { platform: "zoom", meetingId: zoomMatch[1], passcode, originalUrl: trimmed };
   }
 
   // Zoom meeting ID (9-11 digits)
@@ -73,7 +74,7 @@ export function parseMeetingInput(input: string): ParsedMeetingInput | null {
       // Also try to extract passcode from query string
       const passcodeMatch = trimmed.match(/[?&]p=([^&]+)/i);
       const passcode = passcodeMatch ? decodeURIComponent(passcodeMatch[1]) : undefined;
-      return { platform: "teams", meetingId: genericId, passcode };
+      return { platform: "teams", meetingId: genericId, passcode, originalUrl: trimmed };
     }
   }
 

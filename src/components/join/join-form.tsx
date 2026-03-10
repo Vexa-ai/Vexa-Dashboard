@@ -125,6 +125,7 @@ export function JoinForm({ onSuccess }: JoinFormProps) {
       }
 
       if (
+        request.platform &&
         shouldTriggerZoomOAuth(error, request.platform) &&
         request.platform === "zoom" &&
         user?.email

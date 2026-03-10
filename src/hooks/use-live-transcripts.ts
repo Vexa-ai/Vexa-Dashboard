@@ -271,8 +271,8 @@ export function useLiveTranscripts(
               break;
 
             case "error":
-              console.error("[LiveTranscripts] Server error:", message.message);
-              setConnectionError(message.message);
+              console.error("[LiveTranscripts] Server error:", message.error || message.message || message.details);
+              setConnectionError(message.error || message.message || message.details || "Unknown server error");
               break;
           }
         } catch (error) {

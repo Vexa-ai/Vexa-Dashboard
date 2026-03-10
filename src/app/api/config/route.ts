@@ -20,8 +20,9 @@ export async function GET() {
   }
 
   // Get user's auth token from cookie for WebSocket authentication
+  // Env var takes precedence (dev/testing), cookie is for production
   const cookieStore = await cookies();
-  const authToken = cookieStore.get("vexa-token")?.value;
+  const authToken = process.env.VEXA_API_KEY || cookieStore.get("vexa-token")?.value;
 
   // Get default bot name from environment (optional)
   const defaultBotName = process.env.DEFAULT_BOT_NAME || null;

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Video, Loader2, Sparkles, Globe, ChevronDown } from "lucide-react";
+import { Video, Loader2, Sparkles, Globe, ChevronDown, Bot } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -45,6 +45,7 @@ export function JoinModal() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [botName, setBotName] = useState("");
   const [passcode, setPasscode] = useState("");
+  const [agentMode, setAgentMode] = useState(false);
 
   // Default is "auto" so we don't send a language and the transcription service can auto-detect.
   // (Previously we set getBrowserLanguage() here, which sent e.g. "en" and skipped detection.)
@@ -58,6 +59,7 @@ export function JoinModal() {
       setShowAdvanced(false);
       setBotName("");
       setPasscode("");
+      setAgentMode(false);
     }
   }, [isOpen]);
 
@@ -77,10 +79,48 @@ export function JoinModal() {
     }
   }, [parsedInput]);
 
-  const isValid = parsedInput !== null;
+  const isValid = agentMode || parsedInput !== null;
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Agent-only mode
+    if (agentMode) {
+      setIsSubmitting(true);
+      try {
+        const request: CreateBotRequest = { agent_enabled: true };
+        if (parsedInput) {
+          // Agent + meeting: provide both
+          request.platform = parsedInput.platform;
+          request.native_meeting_id = parsedInput.meetingId;
+          // Include passcode (from URL or manual entry) for Teams/Zoom
+          const finalPasscode = parsedInput.passcode || passcode.trim() || undefined;
+          if (finalPasscode) {
+            request.passcode = finalPasscode;
+          }
+          // Pass original URL so API uses it directly instead of reconstructing
+          if (parsedInput.originalUrl) {
+            request.meeting_url = parsedInput.originalUrl;
+          }
+        }
+        const meeting = await vexaAPI.createBot(request);
+        toast.success("Agent launched", {
+          description: "Claude agent container is starting...",
+        });
+        setActiveMeeting(meeting);
+        setCurrentMeeting(meeting);
+        closeModal();
+        router.push(`/meetings/${meeting.id}`);
+        return;
+      } catch (error) {
+        console.error("Failed to launch agent:", error);
+        const { title, description } = getUserFriendlyError(error as Error);
+        toast.error(title, { description });
+        return;
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
 
     if (!parsedInput) {
       toast.error("Invalid meeting", {
@@ -109,6 +149,11 @@ export function JoinModal() {
     // Add passcode for Teams and Zoom meetings
     if ((parsedInput.platform === "teams" || parsedInput.platform === "zoom") && finalPasscode) {
       request.passcode = finalPasscode;
+    }
+
+    // Pass original URL so API uses it directly instead of reconstructing
+    if (parsedInput.originalUrl) {
+      request.meeting_url = parsedInput.originalUrl;
     }
 
     // Set bot name - use custom name or configured default
@@ -148,6 +193,7 @@ export function JoinModal() {
       }
 
       if (
+        request.platform &&
         shouldTriggerZoomOAuth(error, request.platform) &&
         request.platform === "zoom" &&
         user?.email
@@ -175,7 +221,7 @@ export function JoinModal() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [parsedInput, passcode, botName, language, config, setActiveMeeting, setCurrentMeeting, closeModal, router, user]);
+  }, [parsedInput, passcode, botName, language, config, setActiveMeeting, setCurrentMeeting, closeModal, router, user, agentMode]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && closeModal()}>
@@ -193,10 +239,51 @@ export function JoinModal() {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          {/* Agent Mode Toggle */}
+          <button
+            type="button"
+            onClick={() => setAgentMode(!agentMode)}
+            className={cn(
+              "flex items-center gap-3 w-full p-3 rounded-lg border transition-all text-left",
+              agentMode
+                ? "border-purple-500 bg-purple-50 dark:bg-purple-950/30"
+                : "border-border hover:border-muted-foreground/30"
+            )}
+          >
+            <div className={cn(
+              "h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-colors",
+              agentMode
+                ? "bg-purple-500 text-white"
+                : "bg-muted text-muted-foreground"
+            )}>
+              <Bot className="h-4 w-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={cn(
+                "text-sm font-medium",
+                agentMode && "text-purple-700 dark:text-purple-300"
+              )}>
+                Agent Mode
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Launch Claude agent with browser access
+              </p>
+            </div>
+            <div className={cn(
+              "h-5 w-9 rounded-full transition-colors relative",
+              agentMode ? "bg-purple-500" : "bg-muted"
+            )}>
+              <div className={cn(
+                "absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform",
+                agentMode ? "translate-x-4" : "translate-x-0.5"
+              )} />
+            </div>
+          </button>
+
           {/* Meeting Input */}
-          <div className="space-y-2">
-            <Label htmlFor="meetingInput" className="sr-only">
-              Meeting URL or Code
+          <div className={cn("space-y-2", agentMode && "opacity-60")}>
+            <Label htmlFor="meetingInput" className={agentMode ? "text-sm text-muted-foreground" : "sr-only"}>
+              {agentMode ? "Meeting URL (optional — leave empty for agent-only)" : "Meeting URL or Code"}
             </Label>
             <div className="relative">
               {/* Platform Icon - appears when detected */}
@@ -371,14 +458,20 @@ export function JoinModal() {
               type="submit"
               className={cn(
                 "flex-1 h-12 text-base transition-all duration-300",
-                isValid && !isSubmitting && "shadow-lg shadow-primary/25"
+                isValid && !isSubmitting && (agentMode ? "shadow-lg shadow-purple-500/25" : "shadow-lg shadow-primary/25"),
+                agentMode && "bg-purple-600 hover:bg-purple-700"
               )}
               disabled={isSubmitting || !isValid}
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Connecting...
+                  {agentMode ? "Launching..." : "Connecting..."}
+                </>
+              ) : agentMode ? (
+                <>
+                  <Bot className="mr-2 h-5 w-5" />
+                  Launch Agent
                 </>
               ) : (
                 <>

@@ -12,8 +12,8 @@ async function proxyRequest(
   const cookieStore = await cookies();
   const userToken = cookieStore.get("vexa-token")?.value;
 
-  // Fall back to env variable for backwards compatibility
-  const VEXA_API_KEY = userToken || process.env.VEXA_API_KEY || "";
+  // Env var takes precedence when set (dev/testing), cookie is for production
+  const VEXA_API_KEY = process.env.VEXA_API_KEY || userToken || "";
 
   const { path } = await params;
   const pathString = path.join("/");
