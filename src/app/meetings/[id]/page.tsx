@@ -28,6 +28,7 @@ import {
   Zap,
 } from "lucide-react";
 import { AudioPlayer, type AudioPlayerHandle, type AudioFragment } from "@/components/recording/audio-player";
+import { VideoPlayer } from "@/components/recording/video-player";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -170,6 +171,18 @@ export default function MeetingDetailPage() {
         createdAt: rec.created_at,
       };
     });
+  }, [recordings]);
+
+  // Find the most recent completed video recording (if any)
+  const videoRecording = useMemo(() => {
+    for (const rec of [...recordings].sort((a, b) => b.created_at.localeCompare(a.created_at))) {
+      if (rec.status !== "completed" && rec.status !== "in_progress") continue;
+      const videoMedia = rec.media_files?.find(mf => mf.type === "video");
+      if (videoMedia) {
+        return { src: vexaAPI.getRecordingVideoUrl(rec.id, videoMedia.id) };
+      }
+    }
+    return null;
   }, [recordings]);
 
   const hasRecordingAudio = recordingFragments.length > 0;
@@ -690,7 +703,9 @@ export default function MeetingDetailPage() {
     (currentMeeting.status === "completed" && !hasRecordingEntries);
   const canUseSegmentPlayback = isPostMeetingFlow && !noAudioRecordingForMeeting;
   const recordingTopBar = isPostMeetingFlow ? (
-    hasRecordingAudio ? (
+    videoRecording ? (
+      <VideoPlayer src={videoRecording.src} className="w-full max-w-2xl" />
+    ) : hasRecordingAudio ? (
       <AudioPlayer
         ref={audioPlayerRef}
         fragments={recordingFragments}
@@ -700,7 +715,7 @@ export default function MeetingDetailPage() {
       />
     ) : noAudioRecordingForMeeting ? (
       <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg border text-sm text-muted-foreground">
-        No audio recording for this meeting.
+        No recording for this meeting.
       </div>
     ) : (
       <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg border text-sm text-muted-foreground">
