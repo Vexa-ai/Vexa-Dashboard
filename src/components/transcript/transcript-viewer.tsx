@@ -233,7 +233,12 @@ export function TranscriptViewer({
 
       if (!text) continue;
 
-      if (current && current.speaker === speaker) {
+      const gapMs = current
+        ? new Date(startTime).getTime() - new Date(current.endTime).getTime()
+        : 0;
+      const SAME_SPEAKER_GAP_THRESHOLD_MS = 60_000;
+
+      if (current && current.speaker === speaker && gapMs < SAME_SPEAKER_GAP_THRESHOLD_MS) {
         // Merge with current group
         current.combinedText += " " + text;
         current.endTime = endTime;
