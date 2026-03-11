@@ -254,7 +254,7 @@ export default function MeetingDetailPage() {
       currentMeeting?.platform &&
       currentMeeting?.platform_specific_id
     ) {
-      fetchTranscripts(currentMeeting.platform, currentMeeting.platform_specific_id);
+      fetchTranscripts(currentMeeting.platform, currentMeeting.platform_specific_id, String(currentMeeting.id));
     }
   }, [fetchMeeting, fetchTranscripts, meetingId, currentMeeting?.platform, currentMeeting?.platform_specific_id]);
 
@@ -267,7 +267,7 @@ export default function MeetingDetailPage() {
       // Optimistic transition to post-meeting UI immediately after stop is accepted.
       setForcePostMeetingMode(true);
       updateMeetingStatus(String(currentMeeting.id), "stopping");
-      fetchTranscripts(currentMeeting.platform, currentMeeting.platform_specific_id);
+      fetchTranscripts(currentMeeting.platform, currentMeeting.platform_specific_id, String(currentMeeting.id));
       toast.success("Bot stopped", {
         description: "The transcription has been stopped.",
       });
@@ -557,22 +557,23 @@ export default function MeetingDetailPage() {
   // Use specific properties as dependencies to avoid unnecessary refetches
   const meetingPlatform = currentMeeting?.platform;
   const meetingNativeId = currentMeeting?.platform_specific_id;
+  const meetingDbId = currentMeeting?.id != null ? String(currentMeeting.id) : undefined;
   const meetingStatus = currentMeeting?.status;
 
   useEffect(() => {
     // Always refresh transcript/recording artifacts when entering post-meeting flow.
     if ((meetingStatus === "stopping" || meetingStatus === "completed") && meetingPlatform && meetingNativeId) {
-      fetchTranscripts(meetingPlatform, meetingNativeId);
+      fetchTranscripts(meetingPlatform, meetingNativeId, meetingDbId);
       fetchChatMessages(meetingPlatform, meetingNativeId);
       return;
     }
 
     // During non-WS states, use REST fetch as source of truth.
     if (!shouldUseWebSocket && meetingPlatform && meetingNativeId) {
-      fetchTranscripts(meetingPlatform, meetingNativeId);
+      fetchTranscripts(meetingPlatform, meetingNativeId, meetingDbId);
       fetchChatMessages(meetingPlatform, meetingNativeId);
     }
-  }, [meetingStatus, shouldUseWebSocket, meetingPlatform, meetingNativeId, fetchTranscripts, fetchChatMessages]);
+  }, [meetingStatus, shouldUseWebSocket, meetingPlatform, meetingNativeId, meetingDbId, fetchTranscripts, fetchChatMessages]);
 
   // Also fetch chat messages for active meetings (WS handles real-time, REST bootstraps)
   useEffect(() => {

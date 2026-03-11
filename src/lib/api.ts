@@ -110,9 +110,13 @@ export const vexaAPI = {
   // Get meeting info with transcripts - returns full meeting data from transcripts endpoint
   async getMeetingWithTranscripts(
     platform: Platform,
-    nativeId: string
+    nativeId: string,
+    dbMeetingId?: string
   ): Promise<{ meeting: Meeting; segments: TranscriptSegment[]; recordings: RecordingData[] }> {
-    const response = await fetch(`/api/vexa/transcripts/${platform}/${nativeId}`);
+    const url = dbMeetingId
+      ? `/api/vexa/transcripts/${platform}/${nativeId}?meeting_id=${dbMeetingId}`
+      : `/api/vexa/transcripts/${platform}/${nativeId}`;
+    const response = await fetch(url);
     interface RawSegment {
       start: number;
       end: number;

@@ -17,7 +17,8 @@ async function proxyRequest(
 
   const { path } = await params;
   const pathString = path.join("/");
-  const url = `${VEXA_API_URL}/${pathString}`;
+  const search = request.nextUrl.search; // preserve query string (e.g. ?meeting_id=113)
+  const url = `${VEXA_API_URL}/${pathString}${search}`;
 
   const headers: HeadersInit = {
     "Content-Type": "application/json",
