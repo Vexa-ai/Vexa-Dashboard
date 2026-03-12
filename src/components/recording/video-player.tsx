@@ -1,17 +1,33 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useImperativeHandle, forwardRef } from "react";
 import { Play, Pause, Volume2, VolumeX, Maximize2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+export interface VideoPlayerHandle {
+  seekTo: (seconds: number) => void;
+}
+
 interface VideoPlayerProps {
   src: string;
   className?: string;
+  onTimeUpdate?: (currentTime: number) => void;
 }
 
-export function VideoPlayer({ src, className }: VideoPlayerProps) {
+export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
+function VideoPlayer({ src, className, onTimeUpdate }, ref) {
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    seekTo: (seconds: number) => {
+      const video = videoRef.current;
+      if (!video) return;
+      video.currentTime = seconds;
+      setCurrentTime(seconds);
+      video.play();
+    },
+  }));
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -28,7 +44,10 @@ export function VideoPlayer({ src, className }: VideoPlayerProps) {
       setIsLoaded(true);
       setError(null);
     };
-    const onTimeUpdate = () => setCurrentTime(video.currentTime);
+    const handleTimeUpdate = () => {
+      setCurrentTime(video.currentTime);
+      onTimeUpdate?.(video.currentTime);
+    };
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
     const onEnded = () => setIsPlaying(false);
@@ -43,7 +62,7 @@ export function VideoPlayer({ src, className }: VideoPlayerProps) {
     };
 
     video.addEventListener("loadedmetadata", onLoadedMetadata);
-    video.addEventListener("timeupdate", onTimeUpdate);
+    video.addEventListener("timeupdate", handleTimeUpdate);
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
     video.addEventListener("ended", onEnded);
@@ -51,13 +70,13 @@ export function VideoPlayer({ src, className }: VideoPlayerProps) {
 
     return () => {
       video.removeEventListener("loadedmetadata", onLoadedMetadata);
-      video.removeEventListener("timeupdate", onTimeUpdate);
+      video.removeEventListener("timeupdate", handleTimeUpdate);
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("ended", onEnded);
       video.removeEventListener("error", onError);
     };
-  }, []);
+  }, [onTimeUpdate]);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -175,4 +194,6 @@ export function VideoPlayer({ src, className }: VideoPlayerProps) {
       )}
     </div>
   );
-}
+});
+
+VideoPlayer.displayName = "VideoPlayer";
