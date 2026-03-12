@@ -196,19 +196,6 @@ export default function MeetingDetailPage() {
 
   const hasRecordingAudio = recordingFragments.length > 0;
 
-  // Derive recording session start time from transcript segments.
-  // Any segment with both start_time (relative) and absolute_start_time gives us:
-  //   sessionStart = absolute_start_time - start_time * 1000
-  // This is more reliable than recording.created_at (which is the DB insert time, not session start).
-  const videoTimeBase = useMemo(() => {
-    for (const seg of transcripts) {
-      if (seg.absolute_start_time && seg.start_time != null) {
-        return parseUTCTimestamp(seg.absolute_start_time).getTime() - seg.start_time * 1000;
-      }
-    }
-    return null;
-  }, [transcripts]);
-
   const handlePlaybackTimeUpdate = useCallback((time: number) => {
     setPlaybackTime(time);
     setIsPlaybackActive(true);
@@ -219,21 +206,18 @@ export default function MeetingDetailPage() {
   }, []);
 
   // Map a segment click to the correct recording fragment.
-  // `startTimeSeconds` is the segment's start_time (relative to its session).
+  // `startTimeSeconds` is the segment's start_time (meeting-relative after backend fix).
   // `absoluteStartTime` is the segment's absolute_start_time (wall-clock ISO string).
-  // We use absolute_start_time to find which recording fragment the segment belongs to,
-  // then use start_time as the seek offset within that fragment (since start_time is
-  // relative to the session and each recording fragment corresponds to one session).
+  // We derive the seek offset as (absoluteStartTime - recording.createdAt), since
+  // createdAt is now the accurate recording start time (set from bot metadata).
   const handleSegmentClick = useCallback((startTimeSeconds: number, absoluteStartTime?: string) => {
     // If video is showing (not preferAudio), seek the video player directly.
-    // Use absoluteStartTime to compute the correct offset within the continuous video —
-    // start_time resets to 0 after each WhisperLive reconnect (~1h), so it can't be
-    // used directly as a video seek offset for meetings longer than one session.
     if (videoRecording && !preferAudio) {
-      const seekSeconds =
-        absoluteStartTime && videoTimeBase != null
-          ? (parseUTCTimestamp(absoluteStartTime).getTime() - videoTimeBase) / 1000
-          : startTimeSeconds;
+      let seekSeconds = startTimeSeconds;
+      if (absoluteStartTime) {
+        const videoStart = parseUTCTimestamp(videoRecording.createdAt).getTime();
+        seekSeconds = Math.max(0, (parseUTCTimestamp(absoluteStartTime).getTime() - videoStart) / 1000);
+      }
       videoPlayerRef.current?.seekTo(seekSeconds);
       setPlaybackTime(seekSeconds);
       setIsPlaybackActive(true);
@@ -245,20 +229,12 @@ export default function MeetingDetailPage() {
       return;
     }
 
-    if (recordingFragments.length <= 1) {
-      // Single recording — simple seek
-      audioPlayerRef.current?.seekTo(startTimeSeconds);
-      setPlaybackTime(startTimeSeconds);
-      setIsPlaybackActive(true);
-      return;
-    }
-
     // Multi-fragment: find which fragment this segment belongs to.
     // Each fragment has a createdAt timestamp. A segment belongs to the fragment
     // whose createdAt is closest but not after the segment's absolute_start_time.
     let targetFragmentIndex = 0;
-    if (absoluteStartTime) {
-      const segTime = new Date(absoluteStartTime).getTime();
+    if (absoluteStartTime && recordingFragments.length > 1) {
+      const segTime = parseUTCTimestamp(absoluteStartTime).getTime();
       for (let i = recordingFragments.length - 1; i >= 0; i--) {
         const fragTime = new Date(recordingFragments[i].createdAt).getTime();
         if (fragTime <= segTime) {
@@ -268,16 +244,22 @@ export default function MeetingDetailPage() {
       }
     }
 
-    // Seek to the segment's relative start_time within the matched fragment
-    audioPlayerRef.current?.seekToFragment(targetFragmentIndex, startTimeSeconds);
+    const frag = recordingFragments[targetFragmentIndex];
+    // Seek offset = time elapsed since recording fragment start.
+    // Use absoluteStartTime - createdAt when available (accurate after bot sends start_time_utc).
+    const seekWithinFragment = absoluteStartTime && frag
+      ? Math.max(0, (parseUTCTimestamp(absoluteStartTime).getTime() - parseUTCTimestamp(frag.createdAt).getTime()) / 1000)
+      : startTimeSeconds;
+
+    audioPlayerRef.current?.seekToFragment(targetFragmentIndex, seekWithinFragment);
 
     // Compute virtual time for playback highlighting
     const virtualOffset = recordingFragments
       .slice(0, targetFragmentIndex)
       .reduce((sum, f) => sum + (f.duration || 0), 0);
-    setPlaybackTime(virtualOffset + startTimeSeconds);
+    setPlaybackTime(virtualOffset + seekWithinFragment);
     setIsPlaybackActive(true);
-  }, [hasRecordingAudio, recordingFragments, videoRecording, preferAudio, videoTimeBase]);
+  }, [hasRecordingAudio, recordingFragments, videoRecording, preferAudio]);
 
   useEffect(() => {
     if (!hasRecordingAudio || pendingSeekTime == null) return;
@@ -672,23 +654,16 @@ export default function MeetingDetailPage() {
   }, [editedNotes]);
 
   // Compute absolute playback time for transcript highlight matching.
-  // In multi-fragment mode, we convert the virtual playback time to an ISO
-  // absolute timestamp so the transcript viewer can match against absolute_start_time.
+  // recording.created_at is now set to the actual recording start time (from bot metadata),
+  // so we use it directly for both audio and video alignment.
   const playbackAbsoluteTime = useMemo((): string | null => {
     if (playbackTime == null || !isPlaybackActive) return null;
-    // Video mode: use session start time derived from transcript segments.
-    // (recording.created_at is the DB insert time, not when recording content started)
+    // Video mode: use recording.created_at as the video timeline origin.
     if (videoRecording && !preferAudio) {
-      if (videoTimeBase == null) return null;
-      return new Date(videoTimeBase + playbackTime * 1000).toISOString();
+      const videoStart = parseUTCTimestamp(videoRecording.createdAt).getTime();
+      return new Date(videoStart + playbackTime * 1000).toISOString();
     }
-    // Audio mode: prefer videoTimeBase (= session_start_time derived from transcript segments)
-    // over createdAt (DB insert time), since createdAt can differ from session start by a few
-    // seconds (e.g. Teams join flow delay), causing highlights to drift from audio.
-    if (videoTimeBase != null) {
-      return new Date(videoTimeBase + playbackTime * 1000).toISOString();
-    }
-    // Fallback to createdAt if no transcript segments with absolute timestamps yet
+    // Audio mode: walk through fragments, each anchored by its own created_at.
     if (recordingFragments.length === 0) return null;
     if (recordingFragments.length === 1) {
       const fragStart = new Date(recordingFragments[0].createdAt).getTime();
@@ -704,7 +679,7 @@ export default function MeetingDetailPage() {
       remaining -= fragDur;
     }
     return null;
-  }, [playbackTime, isPlaybackActive, recordingFragments, videoRecording, preferAudio, videoTimeBase]);
+  }, [playbackTime, isPlaybackActive, recordingFragments, videoRecording, preferAudio]);
 
   if (error) {
     return (
