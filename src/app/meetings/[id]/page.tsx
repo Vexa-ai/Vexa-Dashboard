@@ -225,10 +225,17 @@ export default function MeetingDetailPage() {
   // then use start_time as the seek offset within that fragment (since start_time is
   // relative to the session and each recording fragment corresponds to one session).
   const handleSegmentClick = useCallback((startTimeSeconds: number, absoluteStartTime?: string) => {
-    // If video is showing (not preferAudio), seek the video player directly
+    // If video is showing (not preferAudio), seek the video player directly.
+    // Use absoluteStartTime to compute the correct offset within the continuous video —
+    // start_time resets to 0 after each WhisperLive reconnect (~1h), so it can't be
+    // used directly as a video seek offset for meetings longer than one session.
     if (videoRecording && !preferAudio) {
-      videoPlayerRef.current?.seekTo(startTimeSeconds);
-      setPlaybackTime(startTimeSeconds);
+      const seekSeconds =
+        absoluteStartTime && videoTimeBase != null
+          ? (parseUTCTimestamp(absoluteStartTime).getTime() - videoTimeBase) / 1000
+          : startTimeSeconds;
+      videoPlayerRef.current?.seekTo(seekSeconds);
+      setPlaybackTime(seekSeconds);
       setIsPlaybackActive(true);
       return;
     }
@@ -270,7 +277,7 @@ export default function MeetingDetailPage() {
       .reduce((sum, f) => sum + (f.duration || 0), 0);
     setPlaybackTime(virtualOffset + startTimeSeconds);
     setIsPlaybackActive(true);
-  }, [hasRecordingAudio, recordingFragments, videoRecording, preferAudio]);
+  }, [hasRecordingAudio, recordingFragments, videoRecording, preferAudio, videoTimeBase]);
 
   useEffect(() => {
     if (!hasRecordingAudio || pendingSeekTime == null) return;
