@@ -682,13 +682,18 @@ export default function MeetingDetailPage() {
       if (videoTimeBase == null) return null;
       return new Date(videoTimeBase + playbackTime * 1000).toISOString();
     }
+    // Audio mode: prefer videoTimeBase (= session_start_time derived from transcript segments)
+    // over createdAt (DB insert time), since createdAt can differ from session start by a few
+    // seconds (e.g. Teams join flow delay), causing highlights to drift from audio.
+    if (videoTimeBase != null) {
+      return new Date(videoTimeBase + playbackTime * 1000).toISOString();
+    }
+    // Fallback to createdAt if no transcript segments with absolute timestamps yet
     if (recordingFragments.length === 0) return null;
     if (recordingFragments.length === 1) {
-      // Single fragment: absolute time = fragment createdAt + playback time
       const fragStart = new Date(recordingFragments[0].createdAt).getTime();
       return new Date(fragStart + playbackTime * 1000).toISOString();
     }
-    // Multi-fragment: find which fragment the virtual time falls in
     let remaining = playbackTime;
     for (let i = 0; i < recordingFragments.length; i++) {
       const fragDur = recordingFragments[i].duration || 0;
