@@ -1,5 +1,6 @@
 import type { Meeting, TranscriptSegment } from "@/types/vexa";
 import { format } from "date-fns";
+import { parseUTCTimestamp } from "@/lib/utils";
 
 // Format seconds to HH:MM:SS
 function formatTimestamp(seconds: number): string {
@@ -27,8 +28,8 @@ function formatSrtTime(seconds: number): string {
 function formatDuration(startTime: string | null, endTime: string | null): string {
   if (!startTime || !endTime) return "Unknown duration";
 
-  const start = new Date(startTime);
-  const end = new Date(endTime);
+  const start = parseUTCTimestamp(startTime);
+  const end = parseUTCTimestamp(endTime);
   const durationMs = end.getTime() - start.getTime();
   const minutes = Math.floor(durationMs / 60000);
 
@@ -49,7 +50,7 @@ export function exportToTxt(meeting: Meeting, segments: TranscriptSegment[]): st
   output += `Platform: ${meeting.platform === "google_meet" ? "Google Meet" : "Microsoft Teams"}\n`;
 
   if (meeting.start_time) {
-    output += `Date: ${format(new Date(meeting.start_time), "PPPp")}\n`;
+    output += `Date: ${format(parseUTCTimestamp(meeting.start_time), "PPPp")}\n`;
   }
 
   if (meeting.start_time && meeting.end_time) {
@@ -144,7 +145,7 @@ export function downloadFile(content: string, filename: string, mimeType: string
 
 export function generateFilename(meeting: Meeting, extension: string): string {
   const date = meeting.start_time
-    ? format(new Date(meeting.start_time), "yyyy-MM-dd")
+    ? format(parseUTCTimestamp(meeting.start_time), "yyyy-MM-dd")
     : format(new Date(), "yyyy-MM-dd");
   const id = meeting.platform_specific_id.replace(/[^a-zA-Z0-9]/g, "-");
   return `transcript-${date}-${id}.${extension}`;

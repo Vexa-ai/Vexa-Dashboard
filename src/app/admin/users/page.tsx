@@ -30,7 +30,7 @@ import { Label } from "@/components/ui/label";
 import { ErrorState } from "@/components/ui/error-state";
 import { useAdminStore } from "@/stores/admin-store";
 import type { CreateUserRequest } from "@/types/vexa";
-import { cn } from "@/lib/utils";
+import { cn, parseUTCTimestamp } from "@/lib/utils";
 import { toast } from "sonner";
 import { DocsLink } from "@/components/docs/docs-link";
 
@@ -268,7 +268,7 @@ export default function AdminUsersPage() {
                         <span>{user.max_concurrent_bots} max</span>
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(user.created_at), { addSuffix: true })}
+                        <span suppressHydrationWarning>{formatDistanceToNow(parseUTCTimestamp(user.created_at), { addSuffix: true })}</span>
                       </div>
                     </div>
 
