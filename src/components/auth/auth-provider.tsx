@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { Loader2 } from "lucide-react";
+import { stripBasePath } from "@/lib/base-path";
 
 // Routes that don't require authentication
-const publicRoutes = ["/login", "/auth/verify", "/auth/zoom/callback"];
+const publicRoutes = ["/login", "/auth/verify"];
 
 interface AuthProviderProps {
   children: React.ReactNode;
@@ -19,7 +20,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [shouldRedirect, setShouldRedirect] = useState(false);
 
   // Check if current route is public
-  const isPublicRoute = publicRoutes.some((route) => pathname?.startsWith(route));
+  const normalizedPathname = stripBasePath(pathname || "/");
+  const isPublicRoute = publicRoutes.some((route) => normalizedPathname.startsWith(route));
 
   // Only verify session on protected routes to avoid 401 in console on /login, /auth/zoom/callback
   useEffect(() => {

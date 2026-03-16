@@ -7,6 +7,7 @@ import { Sidebar } from "./sidebar";
 import { JoinModal } from "@/components/join/join-modal";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/components/auth/auth-provider";
+import { stripBasePath } from "@/lib/base-path";
 
 // Routes that don't need the full app layout
 const publicRoutes = ["/login", "/auth", "/docs"];
@@ -18,9 +19,10 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
+  const normalizedPathname = stripBasePath(pathname || "/");
 
   // Check if current route is public (shouldn't have sidebar/header)
-  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
+  const isPublicRoute = publicRoutes.some((route) => normalizedPathname.startsWith(route));
 
   // For public routes, just render children without the app shell
   if (isPublicRoute) {

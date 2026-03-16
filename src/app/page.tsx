@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { MeetingList } from "@/components/meetings/meeting-list";
 import { ErrorState } from "@/components/ui/error-state";
 import { MCPConfigButton } from "@/components/mcp/mcp-config-button";
+import { withBasePath } from "@/lib/base-path";
 import { useMeetingsStore } from "@/stores/meetings-store";
 import { useJoinModalStore } from "@/stores/join-modal-store";
 
@@ -53,7 +54,7 @@ export default function DashboardPage() {
               className="flex items-center gap-2"
             >
               <img
-                src="/icons/icons8-discord-100.png"
+                src={withBasePath("/icons/icons8-discord-100.png")}
                 alt="Discord"
                 width={20}
                 height={20}
@@ -70,7 +71,7 @@ export default function DashboardPage() {
               className="flex items-center gap-2"
             >
               <img
-                src="/icons/icons8-github-120.png"
+                src={withBasePath("/icons/icons8-github-120.png")}
                 alt="GitHub"
                 width={20}
                 height={20}

@@ -4,6 +4,7 @@ import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { withBasePath } from "@/lib/base-path";
 
 interface LogoProps {
   className?: string;
@@ -34,7 +35,9 @@ export function Logo({ className, size = "md", showText = false }: LogoProps) {
   // Determine which logo to use based on theme
   // Use dark logo in light mode, light logo in dark mode (inverse)
   const currentTheme = theme === "system" ? systemTheme : theme;
-  const logoSrc = currentTheme === "dark" ? "/icons/vexalight.svg" : "/icons/vexadark.svg";
+  const logoSrc = currentTheme === "dark"
+    ? withBasePath("/icons/vexalight.svg")
+    : withBasePath("/icons/vexadark.svg");
 
   if (!mounted) {
     // Return a placeholder while theme is being determined

@@ -1,5 +1,6 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import AzureADProvider from "next-auth/providers/azure-ad";
 import { cookies } from "next/headers";
 import { findUserByEmail, createUser, createUserToken } from "@/lib/vexa-admin-api";
 import { getRegistrationConfig, validateEmailForRegistration } from "@/lib/registration";
@@ -28,6 +29,45 @@ const isGoogleAuthEnabled = () => {
   return hasConfig;
 };
 
+const isAzureAdAuthEnabled = () => {
+  const enableAzureAdAuth = process.env.ENABLE_AZURE_AD_AUTH;
+  if (enableAzureAdAuth === "false" || enableAzureAdAuth === "0") {
+    return false;
+  }
+
+  const hasConfig = !!(
+    process.env.AZURE_AD_CLIENT_ID &&
+    process.env.AZURE_AD_CLIENT_SECRET &&
+    process.env.AZURE_AD_TENANT_ID &&
+    process.env.NEXTAUTH_URL
+  );
+
+  if (enableAzureAdAuth === "true" || enableAzureAdAuth === "1") {
+    return hasConfig;
+  }
+
+  return hasConfig;
+};
+
+const getAppBasePath = (): string => {
+  const rawUrl = process.env.NEXTAUTH_URL;
+  if (!rawUrl) return "";
+  try {
+    const path = new URL(rawUrl).pathname.replace(/\/$/, "");
+    return path.endsWith("/api/auth") ? path.slice(0, -"/api/auth".length) : path;
+  } catch {
+    return "";
+  }
+};
+
+const buildAppPath = (suffix: string): string => {
+  const basePath = getAppBasePath();
+  if (!basePath || basePath === "/") {
+    return suffix;
+  }
+  return `${basePath}${suffix}`;
+};
+
 export const authOptions: NextAuthOptions = {
   providers: [
     ...(isGoogleAuthEnabled()
@@ -38,15 +78,27 @@ export const authOptions: NextAuthOptions = {
           }),
         ]
       : []),
+    ...(isAzureAdAuthEnabled()
+      ? [
+          AzureADProvider({
+            clientId: process.env.AZURE_AD_CLIENT_ID!,
+            clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
+            tenantId: process.env.AZURE_AD_TENANT_ID!,
+          }),
+        ]
+      : []),
   ],
   pages: {
-    signIn: "/login",
-    error: "/login",
+    signIn: buildAppPath("/login"),
+    error: buildAppPath("/login"),
   },
   callbacks: {
     async signIn({ user, account, profile }) {
       // This callback is called after successful OAuth but before session creation
-      if (account?.provider === "google" && user.email) {
+      if (
+        (account?.provider === "google" || account?.provider === "azure-ad") &&
+        user.email
+      ) {
         try {
           // Step 1: Find or create user in Vexa Admin API
           let vexaUser;

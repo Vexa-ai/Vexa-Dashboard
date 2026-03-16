@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { useAdminAuthStore } from "@/stores/admin-auth-store";
 import { AdminAuthModal } from "./admin-auth-modal";
+import { withBasePath } from "@/lib/base-path";
 
 interface AdminGuardProps {
   children: React.ReactNode;
@@ -22,7 +23,7 @@ export function AdminGuard({ children }: AdminGuardProps) {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const response = await fetch("/api/auth/admin-verify");
+        const response = await fetch(withBasePath("/api/auth/admin-verify"));
         const data = await response.json();
 
         if (!data.authenticated && isAdminAuthenticated) {

@@ -42,6 +42,8 @@ import { BotStatusIndicator, BotFailedIndicator } from "@/components/meetings/bo
 import { AIChatPanel } from "@/components/ai";
 import { useMeetingsStore } from "@/stores/meetings-store";
 import { useLiveTranscripts } from "@/hooks/use-live-transcripts";
+import { basePath } from "@/lib/base-path";
+import { withBasePath } from "@/lib/base-path";
 import { PLATFORM_CONFIG, getDetailedStatus } from "@/types/vexa";
 import type { MeetingStatus, Meeting } from "@/types/vexa";
 import { StatusHistory } from "@/components/meetings/status-history";
@@ -431,7 +433,9 @@ export default function MeetingDetailPage() {
 
       // If the gateway is accessed via localhost (dev), providers still need a PUBLIC URL.
       // Allow overriding the public base via NEXT_PUBLIC_TRANSCRIPT_SHARE_BASE_URL.
-      const publicBase = process.env.NEXT_PUBLIC_TRANSCRIPT_SHARE_BASE_URL?.replace(/\/$/, "");
+      const envPublicBase = process.env.NEXT_PUBLIC_TRANSCRIPT_SHARE_BASE_URL?.replace(/\/$/, "");
+      const defaultPublicBase = `${window.location.origin}${basePath || ""}`;
+      const publicBase = envPublicBase || defaultPublicBase;
       const shareUrl =
         publicBase && share.share_id
           ? `${publicBase}/public/transcripts/${share.share_id}.txt`
@@ -561,18 +565,18 @@ export default function MeetingDetailPage() {
 
   useEffect(() => {
     // Always refresh transcript/recording artifacts when entering post-meeting flow.
-    if ((meetingStatus === "stopping" || meetingStatus === "completed") && meetingPlatform && meetingNativeId) {
-      fetchTranscripts(meetingPlatform, meetingNativeId);
+    if ((meetingStatus === "stopping" || meetingStatus === "completed") && meetingPlatform && meetingNativeId && meetingId) {
+      fetchTranscripts(meetingPlatform, meetingNativeId, meetingId);
       fetchChatMessages(meetingPlatform, meetingNativeId);
       return;
     }
 
     // During non-WS states, use REST fetch as source of truth.
-    if (!shouldUseWebSocket && meetingPlatform && meetingNativeId) {
-      fetchTranscripts(meetingPlatform, meetingNativeId);
+    if (!shouldUseWebSocket && meetingPlatform && meetingNativeId && meetingId) {
+      fetchTranscripts(meetingPlatform, meetingNativeId, meetingId);
       fetchChatMessages(meetingPlatform, meetingNativeId);
     }
-  }, [meetingStatus, shouldUseWebSocket, meetingPlatform, meetingNativeId, fetchTranscripts, fetchChatMessages]);
+  }, [meetingStatus, shouldUseWebSocket, meetingPlatform, meetingNativeId, meetingId, fetchTranscripts, fetchChatMessages]);
 
   // Also fetch chat messages for active meetings (WS handles real-time, REST bootstraps)
   useEffect(() => {
@@ -843,7 +847,7 @@ export default function MeetingDetailPage() {
                       title="Connect AI"
                     >
                       <Image
-                        src="/icons/icons8-chatgpt-100.png"
+                        src={withBasePath("/icons/icons8-chatgpt-100.png")}
                         alt="AI"
                         width={18}
                         height={18}
@@ -863,11 +867,11 @@ export default function MeetingDetailPage() {
                   </div>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => handleOpenInProvider("chatgpt")}>
-                    <Image src="/icons/icons8-chatgpt-100.png" alt="ChatGPT" width={16} height={16} className="object-contain mr-2 invert dark:invert-0" />
+                    <Image src={withBasePath("/icons/icons8-chatgpt-100.png")} alt="ChatGPT" width={16} height={16} className="object-contain mr-2 invert dark:invert-0" />
                     Open in ChatGPT
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleOpenInProvider("perplexity")}>
-                    <Image src="/icons/icons8-perplexity-ai-100.png" alt="Perplexity" width={16} height={16} className="object-contain mr-2" />
+                    <Image src={withBasePath("/icons/icons8-perplexity-ai-100.png")} alt="Perplexity" width={16} height={16} className="object-contain mr-2" />
                     Open in Perplexity
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -1098,7 +1102,7 @@ export default function MeetingDetailPage() {
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="icon" className="h-7 w-7 ml-0.5">
                       <Image
-                        src="/icons/icons8-chatgpt-100.png"
+                        src={withBasePath("/icons/icons8-chatgpt-100.png")}
                         alt="AI"
                         width={12}
                         height={12}
@@ -1108,11 +1112,11 @@ export default function MeetingDetailPage() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => handleOpenInProvider("chatgpt")} disabled={transcripts.length === 0}>
-                      <Image src="/icons/icons8-chatgpt-100.png" alt="ChatGPT" width={16} height={16} className="object-contain mr-2 invert dark:invert-0" />
+                      <Image src={withBasePath("/icons/icons8-chatgpt-100.png")} alt="ChatGPT" width={16} height={16} className="object-contain mr-2 invert dark:invert-0" />
                       Open in ChatGPT
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleOpenInProvider("perplexity")} disabled={transcripts.length === 0}>
-                      <Image src="/icons/icons8-perplexity-ai-100.png" alt="Perplexity" width={16} height={16} className="object-contain mr-2" />
+                      <Image src={withBasePath("/icons/icons8-perplexity-ai-100.png")} alt="Perplexity" width={16} height={16} className="object-contain mr-2" />
                       Open in Perplexity
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -1345,10 +1349,10 @@ export default function MeetingDetailPage() {
                 <div className="h-8 w-8 rounded-lg flex items-center justify-center overflow-hidden bg-background">
                   <Image
                     src={currentMeeting.platform === "google_meet"
-                      ? "/icons/icons8-google-meet-96.png"
+                      ? withBasePath("/icons/icons8-google-meet-96.png")
                       : currentMeeting.platform === "teams"
-                      ? "/icons/icons8-teams-96.png"
-                      : "/icons/icons8-zoom-96.png"}
+                      ? withBasePath("/icons/icons8-teams-96.png")
+                      : withBasePath("/icons/icons8-zoom-96.png")}
                     alt={platformConfig.name}
                     width={32}
                     height={32}

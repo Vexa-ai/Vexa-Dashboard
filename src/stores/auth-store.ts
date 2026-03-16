@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { VexaUser } from "@/types/vexa";
+import { withBasePath } from "@/lib/base-path";
 
 interface LoginResult {
   success: boolean;
@@ -40,7 +41,7 @@ export const useAuthStore = create<AuthState>()(
       sendMagicLink: async (email: string): Promise<LoginResult> => {
         set({ isLoading: true });
         try {
-          const response = await fetch("/api/auth/send-magic-link", {
+          const response = await fetch(withBasePath("/api/auth/send-magic-link"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email }),
@@ -97,7 +98,7 @@ export const useAuthStore = create<AuthState>()(
       login: async (email: string) => {
         set({ isLoading: true });
         try {
-          const response = await fetch("/api/auth/login", {
+          const response = await fetch(withBasePath("/api/auth/login"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email }),
@@ -126,7 +127,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         // Clear server-side cookie
-        fetch("/api/auth/logout", { method: "POST" });
+        fetch(withBasePath("/api/auth/logout"), { method: "POST" });
         set({
           user: null,
           token: null,
@@ -148,12 +149,12 @@ export const useAuthStore = create<AuthState>()(
 
         // Try to verify with server (cookie-based)
         try {
-          const response = await fetch("/api/auth/me");
+          const response = await fetch(withBasePath("/api/auth/me"));
           if (response.ok) {
             // Cookie is valid - try to sync OAuth user info if available
             if (!user || !token) {
               try {
-                const oauthResponse = await fetch("/api/auth/oauth-callback");
+                const oauthResponse = await fetch(withBasePath("/api/auth/oauth-callback"));
                 if (oauthResponse.ok) {
                   const oauthData = await oauthResponse.json();
                   if (oauthData.user && oauthData.token) {

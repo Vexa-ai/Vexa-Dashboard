@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { withBasePath } from "@/lib/base-path";
 
 interface AdminAuthState {
   isAdminAuthenticated: boolean;
@@ -23,7 +24,7 @@ export const useAdminAuthStore = create<AdminAuthState>()(
         set({ isVerifying: true, error: null });
 
         try {
-          const response = await fetch("/api/auth/admin-verify", {
+          const response = await fetch(withBasePath("/api/auth/admin-verify"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ token }),
@@ -58,7 +59,7 @@ export const useAdminAuthStore = create<AdminAuthState>()(
 
       logout: () => {
         // Clear server-side admin cookie
-        fetch("/api/auth/admin-logout", { method: "POST" });
+        fetch(withBasePath("/api/auth/admin-logout"), { method: "POST" });
         set({
           isAdminAuthenticated: false,
           error: null
