@@ -317,6 +317,11 @@ export const vexaAPI = {
     return `/api/vexa/recordings/${recordingId}/media/${mediaFileId}/raw`;
   },
 
+  // Recordings - get the proxied URL for streaming video via /raw endpoint
+  getRecordingVideoUrl(recordingId: number, mediaFileId: number): string {
+    return `/api/vexa/recordings/${recordingId}/media/${mediaFileId}/raw`;
+  },
+
   // Connection test
   async testConnection(): Promise<{ success: boolean; error?: string }> {
     try {

@@ -26,8 +26,10 @@ import {
   ExternalLink,
   Trash2,
   Zap,
+  Headphones,
 } from "lucide-react";
 import { AudioPlayer, type AudioPlayerHandle, type AudioFragment } from "@/components/recording/audio-player";
+import { VideoPlayer, type VideoPlayerHandle } from "@/components/recording/video-player";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +47,7 @@ import { useLiveTranscripts } from "@/hooks/use-live-transcripts";
 import { PLATFORM_CONFIG, getDetailedStatus } from "@/types/vexa";
 import type { MeetingStatus, Meeting } from "@/types/vexa";
 import { StatusHistory } from "@/components/meetings/status-history";
-import { cn } from "@/lib/utils";
+import { cn, parseUTCTimestamp } from "@/lib/utils";
 import { vexaAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { LanguagePicker } from "@/components/language-picker";
@@ -144,8 +146,10 @@ export default function MeetingDetailPage() {
   );
   const [isUpdatingConfig, setIsUpdatingConfig] = useState(false);
 
-  // Audio playback state
+  // Audio/video playback state
   const audioPlayerRef = useRef<AudioPlayerHandle>(null);
+  const videoPlayerRef = useRef<VideoPlayerHandle>(null);
+  const [preferAudio, setPreferAudio] = useState(false);
   const [playbackTime, setPlaybackTime] = useState<number | null>(null);
   const [isPlaybackActive, setIsPlaybackActive] = useState(false);
   const [pendingSeekTime, setPendingSeekTime] = useState<number | null>(null);
@@ -158,7 +162,13 @@ export default function MeetingDetailPage() {
     // Include recordings that have audio media files, whether completed or in_progress
     // (in_progress recordings may have snapshot uploads available for playback)
     const availableRecordings = recordings
-      .filter(r => (r.status === "completed" || r.status === "in_progress") && r.media_files?.some(mf => mf.type === "audio"))
+      .filter(r =>
+        (r.status === "completed" || r.status === "in_progress") &&
+        r.media_files?.some(mf => mf.type === "audio") &&
+        // Exclude recordings that also have video (those are cloud recordings;
+        // their audio content is the same as the video and is shown there instead)
+        !r.media_files?.some(mf => mf.type === "video")
+      )
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
 
     return availableRecordings.map(rec => {
@@ -170,6 +180,18 @@ export default function MeetingDetailPage() {
         createdAt: rec.created_at,
       };
     });
+  }, [recordings]);
+
+  // Find the most recent completed video recording (if any)
+  const videoRecording = useMemo(() => {
+    for (const rec of [...recordings].sort((a, b) => b.created_at.localeCompare(a.created_at))) {
+      if (rec.status !== "completed" && rec.status !== "in_progress") continue;
+      const videoMedia = rec.media_files?.find(mf => mf.type === "video");
+      if (videoMedia) {
+        return { src: vexaAPI.getRecordingVideoUrl(rec.id, videoMedia.id), createdAt: rec.created_at };
+      }
+    }
+    return null;
   }, [recordings]);
 
   const hasRecordingAudio = recordingFragments.length > 0;
@@ -184,22 +206,26 @@ export default function MeetingDetailPage() {
   }, []);
 
   // Map a segment click to the correct recording fragment.
-  // `startTimeSeconds` is the segment's start_time (relative to its session).
+  // `startTimeSeconds` is the segment's start_time (meeting-relative after backend fix).
   // `absoluteStartTime` is the segment's absolute_start_time (wall-clock ISO string).
-  // We use absolute_start_time to find which recording fragment the segment belongs to,
-  // then use start_time as the seek offset within that fragment (since start_time is
-  // relative to the session and each recording fragment corresponds to one session).
+  // We derive the seek offset as (absoluteStartTime - recording.createdAt), since
+  // createdAt is now the accurate recording start time (set from bot metadata).
   const handleSegmentClick = useCallback((startTimeSeconds: number, absoluteStartTime?: string) => {
-    if (!hasRecordingAudio) {
-      setPendingSeekTime(startTimeSeconds);
+    // If video is showing (not preferAudio), seek the video player directly.
+    if (videoRecording && !preferAudio) {
+      let seekSeconds = startTimeSeconds;
+      if (absoluteStartTime) {
+        const videoStart = parseUTCTimestamp(videoRecording.createdAt).getTime();
+        seekSeconds = Math.max(0, (parseUTCTimestamp(absoluteStartTime).getTime() - videoStart) / 1000);
+      }
+      videoPlayerRef.current?.seekTo(seekSeconds);
+      setPlaybackTime(seekSeconds);
+      setIsPlaybackActive(true);
       return;
     }
 
-    if (recordingFragments.length <= 1) {
-      // Single recording — simple seek
-      audioPlayerRef.current?.seekTo(startTimeSeconds);
-      setPlaybackTime(startTimeSeconds);
-      setIsPlaybackActive(true);
+    if (!hasRecordingAudio) {
+      setPendingSeekTime(startTimeSeconds);
       return;
     }
 
@@ -207,8 +233,8 @@ export default function MeetingDetailPage() {
     // Each fragment has a createdAt timestamp. A segment belongs to the fragment
     // whose createdAt is closest but not after the segment's absolute_start_time.
     let targetFragmentIndex = 0;
-    if (absoluteStartTime) {
-      const segTime = new Date(absoluteStartTime).getTime();
+    if (absoluteStartTime && recordingFragments.length > 1) {
+      const segTime = parseUTCTimestamp(absoluteStartTime).getTime();
       for (let i = recordingFragments.length - 1; i >= 0; i--) {
         const fragTime = new Date(recordingFragments[i].createdAt).getTime();
         if (fragTime <= segTime) {
@@ -218,16 +244,22 @@ export default function MeetingDetailPage() {
       }
     }
 
-    // Seek to the segment's relative start_time within the matched fragment
-    audioPlayerRef.current?.seekToFragment(targetFragmentIndex, startTimeSeconds);
+    const frag = recordingFragments[targetFragmentIndex];
+    // Seek offset = time elapsed since recording fragment start.
+    // Use absoluteStartTime - createdAt when available (accurate after bot sends start_time_utc).
+    const seekWithinFragment = absoluteStartTime && frag
+      ? Math.max(0, (parseUTCTimestamp(absoluteStartTime).getTime() - parseUTCTimestamp(frag.createdAt).getTime()) / 1000)
+      : startTimeSeconds;
+
+    audioPlayerRef.current?.seekToFragment(targetFragmentIndex, seekWithinFragment);
 
     // Compute virtual time for playback highlighting
     const virtualOffset = recordingFragments
       .slice(0, targetFragmentIndex)
       .reduce((sum, f) => sum + (f.duration || 0), 0);
-    setPlaybackTime(virtualOffset + startTimeSeconds);
+    setPlaybackTime(virtualOffset + seekWithinFragment);
     setIsPlaybackActive(true);
-  }, [hasRecordingAudio, recordingFragments]);
+  }, [hasRecordingAudio, recordingFragments, videoRecording, preferAudio]);
 
   useEffect(() => {
     if (!hasRecordingAudio || pendingSeekTime == null) return;
@@ -622,16 +654,21 @@ export default function MeetingDetailPage() {
   }, [editedNotes]);
 
   // Compute absolute playback time for transcript highlight matching.
-  // In multi-fragment mode, we convert the virtual playback time to an ISO
-  // absolute timestamp so the transcript viewer can match against absolute_start_time.
+  // recording.created_at is now set to the actual recording start time (from bot metadata),
+  // so we use it directly for both audio and video alignment.
   const playbackAbsoluteTime = useMemo((): string | null => {
-    if (playbackTime == null || !isPlaybackActive || recordingFragments.length === 0) return null;
+    if (playbackTime == null || !isPlaybackActive) return null;
+    // Video mode: use recording.created_at as the video timeline origin.
+    if (videoRecording && !preferAudio) {
+      const videoStart = parseUTCTimestamp(videoRecording.createdAt).getTime();
+      return new Date(videoStart + playbackTime * 1000).toISOString();
+    }
+    // Audio mode: walk through fragments, each anchored by its own created_at.
+    if (recordingFragments.length === 0) return null;
     if (recordingFragments.length === 1) {
-      // Single fragment: absolute time = fragment createdAt + playback time
       const fragStart = new Date(recordingFragments[0].createdAt).getTime();
       return new Date(fragStart + playbackTime * 1000).toISOString();
     }
-    // Multi-fragment: find which fragment the virtual time falls in
     let remaining = playbackTime;
     for (let i = 0; i < recordingFragments.length; i++) {
       const fragDur = recordingFragments[i].duration || 0;
@@ -642,7 +679,7 @@ export default function MeetingDetailPage() {
       remaining -= fragDur;
     }
     return null;
-  }, [playbackTime, isPlaybackActive, recordingFragments]);
+  }, [playbackTime, isPlaybackActive, recordingFragments, videoRecording, preferAudio]);
 
   if (error) {
     return (
@@ -688,9 +725,45 @@ export default function MeetingDetailPage() {
   const noAudioRecordingForMeeting =
     recordingExplicitlyDisabled ||
     (currentMeeting.status === "completed" && !hasRecordingEntries);
-  const canUseSegmentPlayback = isPostMeetingFlow && !noAudioRecordingForMeeting;
+  const canUseSegmentPlayback = isPostMeetingFlow && (!noAudioRecordingForMeeting || !!videoRecording);
   const recordingTopBar = isPostMeetingFlow ? (
-    hasRecordingAudio ? (
+    videoRecording ? (
+      <div className="w-full max-w-2xl space-y-1">
+        {!preferAudio && (
+          <VideoPlayer
+            ref={videoPlayerRef}
+            src={videoRecording.src}
+            className="w-full"
+            onTimeUpdate={handlePlaybackTimeUpdate}
+          />
+        )}
+        {preferAudio && hasRecordingAudio && (
+          <AudioPlayer
+            ref={audioPlayerRef}
+            fragments={recordingFragments}
+            onTimeUpdate={handlePlaybackTimeUpdate}
+            onFragmentChange={handleFragmentChange}
+            compact
+          />
+        )}
+        {hasRecordingAudio && (
+          <div className="flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-muted-foreground gap-1"
+              onClick={() => setPreferAudio((v) => !v)}
+            >
+              {preferAudio ? (
+                <><Video className="h-3 w-3" /> Show video</>
+              ) : (
+                <><Headphones className="h-3 w-3" /> Audio only</>
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+    ) : hasRecordingAudio ? (
       <AudioPlayer
         ref={audioPlayerRef}
         fragments={recordingFragments}
@@ -700,7 +773,7 @@ export default function MeetingDetailPage() {
       />
     ) : noAudioRecordingForMeeting ? (
       <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg border text-sm text-muted-foreground">
-        No audio recording for this meeting.
+        No recording for this meeting.
       </div>
     ) : (
       <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg border text-sm text-muted-foreground">
